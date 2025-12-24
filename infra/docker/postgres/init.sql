@@ -1,0 +1,3 @@
+-- Placeholder init script (optional)
+-- You can create extensions here if needed:
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

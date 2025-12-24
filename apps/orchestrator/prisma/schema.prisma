@@ -1,0 +1,80 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model ToolServer {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  baseUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tools     Tool[]
+}
+
+model Tool {
+  id            String   @id @default(cuid())
+  serverId      String
+  name          String
+  description   String?
+  riskLevel     String   @default("LOW")
+  requiredRoles String[] @default([])
+  piiFields     String[] @default([])
+  argsSchema    Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  server        ToolServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  @@unique([serverId, name])
+}
+
+model Command {
+  id        String   @id @default(cuid())
+  raw       String
+  createdAt DateTime @default(now())
+  plan      Plan?
+  runs      Run[]
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  commandId    String   @unique
+  steps        Json
+  needsApproval Boolean @default(false)
+  createdAt    DateTime @default(now())
+  command      Command  @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  approval     Approval?
+}
+
+model Approval {
+  id         String   @id @default(cuid())
+  planId     String   @unique
+  status     String   @default("PENDING")
+  reason     String?
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+  plan       Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model Run {
+  id         String   @id @default(cuid())
+  commandId  String
+  planId     String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  finishedAt DateTime?
+  steps      Step[]
+  command    Command @relation(fields: [commandId], references: [id], onDelete: Cascade)
+}
+
+model Step {
+  id         String   @id @default(cuid())
+  runId      String
+  index      Int
+  tool       String
+  args       Json
+  status     String   @default("PENDING")
+  result     Json?
+  error      String?
+  createdAt  DateTime @default(now())
+  finishedAt DateTime?
+  run        Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@unique([runId, index])
+}
