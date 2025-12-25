@@ -32,6 +32,62 @@ docker compose up -d
 docker compose logs -f orchestrator
 
 
+# 도커실행방법
+
+🚀 기본 실행 루틴
+docker compose up -d --build
+docker compose ps
+
+
+코드 변경 후 반영까지 포함 (이미지 재빌드)
+
+모든 서비스가 정상적으로 떠 있는지 확인
+
+📜 로그 확인 (필수 / 자주 사용)
+docker compose logs -f orchestrator
+docker compose logs -f frontend
+docker compose logs -f hr-mcp-server
+docker compose logs -f postgres
+
+⚠️ 중요
+
+서비스명은 docker compose ps에 표시되는 SERVICE 컬럼 기준
+
+컨테이너 이름(container_name)이 아님
+→ 예: company-postgres ❌ / postgres ✅
+
+잘못 쓰면 no such service 에러 발생
+
+⚡ 재빌드 없이 그냥 켜기 (빠름)
+
+코드 변경이 없고 단순 재실행만 할 경우:
+
+docker compose up -d
+
+🧨 완전 초기화 (볼륨까지 전부 삭제)
+
+⚠️ DB 데이터까지 전부 삭제됨
+정말 초기화가 필요할 때만 사용
+
+docker compose down -v
+
+🎯 특정 서비스만 재시작 / 재빌드
+
+예: orchestrator만 코드 변경했을 경우
+
+docker compose up -d --build orchestrator
+
+✅ 결론
+
+평소 개발 루틴
+
+docker compose up -d --build
+docker compose ps
+
+
+문제 생기면
+
+docker compose logs -f <서비스명>
 
 
 ## 구조
