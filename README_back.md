@@ -32,67 +32,11 @@ docker compose up -d
 docker compose logs -f orchestrator
 
 
-# 도커실행방법
-
-🚀 기본 실행 루틴
-docker compose up -d --build
-docker compose ps
-
-
-코드 변경 후 반영까지 포함 (이미지 재빌드)
-
-모든 서비스가 정상적으로 떠 있는지 확인
-
-📜 로그 확인 (필수 / 자주 사용)
-docker compose logs -f orchestrator
-docker compose logs -f frontend
-docker compose logs -f hr-mcp-server
-docker compose logs -f postgres
-
-⚠️ 중요
-
-서비스명은 docker compose ps에 표시되는 SERVICE 컬럼 기준
-
-컨테이너 이름(container_name)이 아님
-→ 예: company-postgres ❌ / postgres ✅
-
-잘못 쓰면 no such service 에러 발생
-
-⚡ 재빌드 없이 그냥 켜기 (빠름)
-
-코드 변경이 없고 단순 재실행만 할 경우:
-
-docker compose up -d
-
-🧨 완전 초기화 (볼륨까지 전부 삭제)
-
-⚠️ DB 데이터까지 전부 삭제됨
-정말 초기화가 필요할 때만 사용
-
-docker compose down -v
-
-🎯 특정 서비스만 재시작 / 재빌드
-
-예: orchestrator만 코드 변경했을 경우
-
-docker compose up -d --build orchestrator
-
-✅ 결론
-
-평소 개발 루틴
-
-docker compose up -d --build
-docker compose ps
-
-
-문제 생기면
-
-docker compose logs -f <서비스명>
 
 
 ## 구조
 
-iPaaS-engine/
+company-automation/
 ├─ apps/
 │  ├─ orchestrator/                     # 중앙 오케스트레이터 (NestJS)
 │  │  ├─ src/
@@ -110,8 +54,7 @@ iPaaS-engine/
 │  │  │  │  │  └─ roles.guard.ts
 │  │  │  │  ├─ logging/
 │  │  │  │  │  ├─ logger.module.ts
-│  │  │  │  │  ├─ pino.logger.ts
-│  │  │  │  │  └─ audit.service.ts      # 감사 로깅
+│  │  │  │  │  └─ pino.logger.ts
 │  │  │  │  └─ utils/
 │  │  │  │     ├─ mask.ts               # PII 마스킹
 │  │  │  │     └─ idempotency.ts        # idempotency key 생성
@@ -126,7 +69,6 @@ iPaaS-engine/
 │  │  │  │  ├─ tool-registry/           # 1) MCP tools 수집 + 표준화(메타/스키마)
 │  │  │  │  │  ├─ tool-registry.module.ts
 │  │  │  │  │  ├─ tool-registry.service.ts
-│  │  │  │  │  ├─ tool-registry.controller.ts
 │  │  │  │  │  ├─ tool-metadata.ts      # risk/roles/piiFields 등 표준 메타 타입
 │  │  │  │  │  ├─ schema/
 │  │  │  │  │  │  ├─ tool.schema.ts     # tool args/result schema 타입
@@ -186,46 +128,33 @@ iPaaS-engine/
 │  │  │  │  ├─ runs/                    # 8) 실행 이력 조회/모니터링 API
 │  │  │  │  │  ├─ runs.module.ts
 │  │  │  │  │  ├─ runs.controller.ts
-│  │  │  │  │  ├─ runs.service.ts
-│  │  │  │  │  └─ health.controller.ts  # 헬스체크 엔드포인트
-│  │  │  │  ├─ command-api/             # 0) 진입점(자연어 명령 접수)
-│  │  │  │  │  ├─ command.module.ts
-│  │  │  │  │  ├─ command.controller.ts
-│  │  │  │  │  ├─ command.service.ts     # interpret → plan → policy → (approval/exe)
-│  │  │  │  │  └─ dto/
-│  │  │  │  │     └─ create-command.dto.ts
-│  │  │  │  └─ jobs/                    # (선택) 크론/정리 작업
-│  │  │  │     ├─ cleanup.job.ts
-│  │  │  │     └─ scheduler.module.ts
-│  │  │  └─ prisma/
-│  │  │     ├─ schema.prisma
-│  │  │     ├─ prisma.module.ts
-│  │  │     └─ migrations/
+│  │  │  │  │  └─ runs.service.ts
+│  │  │  │  └─ command-api/             # 0) 진입점(자연어 명령 접수)
+│  │  │  │     ├─ command.module.ts
+│  │  │  │     ├─ command.controller.ts
+│  │  │  │     ├─ command.service.ts     # interpret → plan → policy → (approval/exe)
+│  │  │  │     └─ dto/
+│  │  │  │        ├─ create-command.dto.ts
+│  │  │  │        └─ command.response.dto.ts
+│  │  │  ├─ prisma/
+│  │  │  │  ├─ schema.prisma
+│  │  │  │  └─ migrations/
+│  │  │  └─ jobs/                        # (선택) 크론/정리 작업
+│  │  │     ├─ cleanup.job.ts
+│  │  │     └─ scheduler.module.ts
 │  │  ├─ test/
-│  │  │  ├─ idempotency.spec.ts
-│  │  │  └─ policy-engine.spec.ts
 │  │  ├─ package.json
 │  │  ├─ Dockerfile
-│  │  ├─ README.md
-│  │  ├─ jest.config.cjs
-│  │  ├─ nest-cli.json
-│  │  └─ tsconfig.json
+│  │  └─ README.md
 │  │
 │  ├─ frontend/                          # 관리 UI (Nuxt3/Vue3)
 │  │  ├─ pages/
-│  │  │  ├─ index.vue
 │  │  │  ├─ servers/                     # MCP 서버/툴 관리
-│  │  │  │  └─ index.vue
 │  │  │  ├─ workflows/                   # 워크플로우 빌더
-│  │  │  │  └─ index.vue
 │  │  │  ├─ approvals/                   # 승인 큐
-│  │  │  │  └─ index.vue
 │  │  │  └─ runs/                        # 실행 모니터링
-│  │  │     └─ index.vue
 │  │  ├─ components/
-│  │  ├─ package.json
-│  │  ├─ nuxt.config.ts
-│  │  └─ Dockerfile
+│  │  └─ package.json
 │  │
 │  └─ worker/                            # (선택) 무거운 작업 분리(같은 코드 공유 가능)
 │     ├─ src/
@@ -247,8 +176,7 @@ iPaaS-engine/
 │  │  │  │  ├─ tools.schema.ts          # args/result JSON schema
 │  │  │  │  └─ metadata.ts              # risk/roles/piiFields
 │  │  │  ├─ app.module.ts
-│  │  │  ├─ main.ts
-│  │  │  └─ main.js
+│  │  │  └─ main.ts
 │  │  ├─ package.json
 │  │  └─ Dockerfile
 │  │

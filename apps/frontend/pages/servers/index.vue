@@ -1,40 +1,64 @@
+<!-- apps/frontend/pages/servers/index.vue -->
 <template>
-  <div
-    style="max-width: 980px; margin: 24px auto; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;"
-  >
-    <h2 style="margin: 0 0 12px;">Servers</h2>
+  <div style="padding: 18px">
+    <h2 style="font-size: 18px; font-weight: 700">Tool Servers</h2>
 
-    <button
-      @click="sync"
-      style="padding: 8px 12px; border: 1px solid #333; border-radius: 10px; background: #fff; cursor: pointer;"
-    >
-      Sync Tool Registry
-    </button>
+    <div style="margin-top: 12px">
+      <button @click="sync" :disabled="syncing" style="padding: 8px 10px; border: 1px solid #ccc; border-radius: 10px">
+        {{ syncing ? "Syncing..." : "Sync" }}
+      </button>
+      <span style="margin-left: 10px; color: #666">
+        {{ statusMessage }}
+      </span>
+    </div>
 
-    <pre
-      style="margin-top: 12px; padding: 12px; border: 1px solid #eee; border-radius: 10px; background: #fafafa; overflow: auto;"
-    >{{ out }}</pre>
+    <div v-if="loading" style="margin-top: 12px">Loading...</div>
+    <div v-else>
+      <div
+        v-for="t in tools"
+        :key="t.name"
+        style="margin-top: 12px; padding: 12px; border: 1px solid #ddd; border-radius: 12px"
+      >
+        <div style="display: flex; justify-content: space-between">
+          <div style="font-weight: 700">{{ t.name }}</div>
+          <div style="color: #666">{{ t.serverName }}</div>
+        </div>
+        <div style="margin-top: 6px; color: #444">{{ t.description }}</div>
+      </div>
+    </div>
   </div>
 </template>
 
-<script setup lang="ts">
-const config = useRuntimeConfig()
-const out = ref("")
+<script setup>
+const tools = ref([]);
+const loading = ref(true);
+const syncing = ref(false);
+const statusMessage = ref("");
 
-function pretty(v: any) {
+async function fetchTools() {
+  loading.value = true;
   try {
-    return typeof v === "string" ? v : JSON.stringify(v, null, 2)
-  } catch {
-    return String(v)
+    const res = await fetch("/api/tool-registry/tools");
+    tools.value = await res.json();
+  } finally {
+    loading.value = false;
   }
 }
 
 async function sync() {
-  const r: any = await $fetch(`${config.public.apiBase}/tool-registry/sync`)
-  out.value = pretty(r)
+  syncing.value = true;
+  statusMessage.value = "";
+  try {
+    const res = await fetch("/api/tool-registry/sync");
+    const data = await res.json();
+    statusMessage.value = data?.ok ? "Synced" : "Sync failed";
+    await fetchTools();
+  } catch (e) {
+    statusMessage.value = "Sync error";
+  } finally {
+    syncing.value = false;
+  }
 }
 
-onMounted(() => {
-  out.value = "Ready. Click 'Sync Tool Registry'."
-})
+onMounted(fetchTools);
 </script>
