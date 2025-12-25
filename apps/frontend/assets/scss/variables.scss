@@ -1,0 +1,60 @@
+/* 색상 변수 */
+$bg-primary: #0b1220;
+$text-primary: #e6edf7;
+$text-secondary: rgba(230, 237, 247, 0.92);
+$text-muted: rgba(230, 237, 247, 0.72);
+
+$border-primary: rgba(255, 255, 255, 0.10);
+$border-secondary: rgba(255, 255, 255, 0.12);
+$border-light: rgba(255, 255, 255, 0.08);
+
+$bg-overlay: rgba(255, 255, 255, 0.04);
+$bg-overlay-light: rgba(255, 255, 255, 0.06);
+$bg-overlay-dark: rgba(0, 0, 0, 0.35);
+$bg-header: rgba(11, 18, 32, 0.85);
+
+$btn-primary-bg: rgba(230, 237, 247, 0.92);
+$btn-primary-text: #0b1220;
+$btn-secondary-bg: rgba(255, 255, 255, 0.06);
+$btn-secondary-text: rgba(230, 237, 247, 0.92);
+$btn-danger-bg: rgba(239, 68, 68, 0.18);
+$btn-danger-text: rgba(255, 200, 200, 0.95);
+
+$error-color: #ff8a8a;
+$warn-bg: rgba(245, 158, 11, 0.18);
+
+/* 간격 변수 */
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 18px;
+$spacing-2xl: 24px;
+
+/* 둥근 모서리 */
+$radius-sm: 10px;
+$radius-md: 12px;
+$radius-lg: 14px;
+$radius-xl: 16px;
+$radius-full: 999px;
+
+/* 폰트 크기 */
+$font-xs: 12px;
+$font-sm: 13px;
+$font-base: 14px;
+$font-md: 16px;
+$font-lg: 18px;
+$font-xl: 20px;
+$font-2xl: 22px;
+
+/* 폰트 굵기 */
+$font-normal: 400;
+$font-medium: 500;
+$font-semibold: 700;
+$font-bold: 800;
+$font-black: 900;
+
+/* 레이아웃 */
+$max-width: 1100px;
+$header-height: auto;
+

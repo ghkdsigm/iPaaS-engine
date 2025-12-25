@@ -1,0 +1,52 @@
+/* 믹스인 */
+@mixin button-base {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: $radius-md;
+  border: 1px solid $border-primary;
+  font-weight: $font-bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@mixin button-primary {
+  @include button-base;
+  background: $btn-primary-bg;
+  color: $btn-primary-text;
+}
+
+@mixin button-secondary {
+  @include button-base;
+  background: $btn-secondary-bg;
+  color: $btn-secondary-text;
+}
+
+@mixin button-danger {
+  @include button-base;
+  background: $btn-danger-bg;
+  color: $btn-danger-text;
+}
+
+@mixin card {
+  border: 1px solid $border-primary;
+  border-radius: $radius-xl;
+  padding: $spacing-lg;
+  background: $bg-overlay;
+}
+
+@mixin pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: $radius-full;
+  border: 1px solid $border-primary;
+  background: $bg-overlay-light;
+  font-size: $font-xs;
+  opacity: 0.92;
+}
+

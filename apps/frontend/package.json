@@ -10,5 +10,8 @@
   },
   "dependencies": {
     "nuxt": "^3.13.2"
+  },
+  "devDependencies": {
+    "sass": "^1.97.1"
   }
 }
