@@ -15,7 +15,14 @@ const tools = [
     description: "Generate a unique employee id for a new hire",
     riskLevel: "LOW",
     requiredRoles: ["hr"],
-    argsSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+    argsSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        name: { type: "string", minLength: 1 }
+      },
+      required: ["name"]
+    }
   },
   {
     name: "hr.create_employee_account",
@@ -25,16 +32,17 @@ const tools = [
     piiFields: ["bankAccount", "salary"],
     argsSchema: {
       type: "object",
+      additionalProperties: true,
       properties: {
-        employeeId: { type: "string" },
-        name: { type: "string" },
-        dept: { type: "string" },
-        startDate: { type: "string" },
+        employeeId: { type: "string", minLength: 1 },
+        name: { type: "string", minLength: 1 },
+        dept: { type: "string", minLength: 1 },
+        startDate: { type: "string", minLength: 1 },
         salary: { type: "number" },
-        bankAccount: { type: "string" },
+        bankAccount: { type: "string" }
       },
-      required: ["employeeId", "name", "dept", "startDate"],
-    },
+      required: ["employeeId", "name", "dept", "startDate"]
+    }
   },
   {
     name: "hr.delete_employee",
@@ -43,65 +51,88 @@ const tools = [
     requiredRoles: ["hr_admin"],
     argsSchema: {
       type: "object",
-      properties: { employeeId: { type: "string" } },
-      required: ["employeeId"],
-    },
-  },
+      additionalProperties: true,
+      properties: {
+        employeeId: { type: "string", minLength: 1 },
+        reason: { type: "string" }
+      },
+      required: ["employeeId"]
+    }
+  }
 ];
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "hr-mcp-server" }));
+app.get("/health", (_req, res) => {
+  res.json({ ok: true, service: "hr-mcp-server", time: new Date().toISOString() });
+});
 
 app.get("/tools", (_req, res) => {
-  res.json({ ok: true, tools });
+  res.json({ tools });
 });
 
-app.post("/invoke", (req, res) => {
-  const tool = String(req.body?.tool || "").trim();
-  const args = req.body?.args || {};
-  const user = req.body?.user || { roles: [] };
+const ExecuteBodySchema = z
+  .object({
+    tool: z.string(),
+    args: z.record(z.any()).optional()
+  })
+  .passthrough();
 
-  const found = tools.find((t) => t.name === tool);
-  if (!found) return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
-
-  const roles = Array.isArray(user.roles) ? user.roles : [];
-  const required = Array.isArray(found.requiredRoles) ? found.requiredRoles : [];
-  const allowed = required.every((r) => roles.includes(r));
-  if (!allowed) return res.status(403).json({ ok: false, error: "Forbidden" });
-
-  if (tool === "hr.generate_employee_id") {
-    const name = String(args.name || "").trim();
-    if (!name) return res.status(400).json({ ok: false, error: "name is required" });
-    return res.json({ ok: true, result: generateEmployeeId(name) });
+async function handleExecute(req, res) {
+  const parsed = ExecuteBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, error: parsed.error.flatten() });
   }
 
-  if (tool === "hr.create_employee_account") {
-    const schema = z
-      .object({
-        employeeId: z.string().min(1),
-        name: z.string().min(1),
-        dept: z.string().min(1),
-        startDate: z.string().min(1),
-        salary: z.number().optional(),
-        bankAccount: z.string().optional(),
-      })
-      .strict();
+  const tool = parsed.data.tool;
+  const args = parsed.data.args || {};
 
-    const parsed = schema.safeParse(args);
-    if (!parsed.success) {
-      return res.status(400).json({ ok: false, error: parsed.error.flatten() });
+  try {
+    if (tool === "hr.generate_employee_id") {
+      const name = typeof args.name === "string" ? args.name.trim() : "";
+      if (!name) return res.status(400).json({ ok: false, error: "name is required" });
+
+      const employeeId = generateEmployeeId({ name });
+
+      // 중요: 문자열이 아니라 객체로 반환해야 "{{step0.employeeId}}"가 동작함
+      return res.json({ ok: true, result: { employeeId } });
     }
 
-    const input = parsed.data;
-    return res.json({ ok: true, result: createEmployeeAccount(input) });
-  }
+    if (tool === "hr.create_employee_account") {
+      const input = {
+        employeeId: args.employeeId,
+        name: args.name,
+        dept: args.dept,
+        startDate: args.startDate,
+        salary: args.salary,
+        bankAccount: args.bankAccount
+      };
 
-  if (tool === "hr.delete_employee") {
-    const employeeId = String(args.employeeId || "").trim();
-    if (!employeeId) return res.status(400).json({ ok: false, error: "employeeId is required" });
-    return res.json({ ok: true, result: deleteEmployee({ employeeId }) });
-  }
+      const result = createEmployeeAccount(input);
+      return res.json({ ok: true, result });
+    }
 
-  return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
+    if (tool === "hr.delete_employee") {
+      const employeeId = typeof args.employeeId === "string" ? args.employeeId.trim() : "";
+      if (!employeeId) return res.status(400).json({ ok: false, error: "employeeId is required" });
+
+      const result = deleteEmployee({
+        employeeId,
+        reason: typeof args.reason === "string" ? args.reason : undefined
+      });
+
+      return res.json({ ok: true, result });
+    }
+
+    return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return res.status(500).json({ ok: false, error: message });
+  }
+}
+
+
+app.post("/execute", handleExecute);
+app.post("/invoke", handleExecute);
+
+app.listen(PORT, () => {
+  console.log(`[hr-mcp-server] listening on :${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`[hr-mcp] listening on :${PORT}`));

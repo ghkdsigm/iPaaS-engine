@@ -5,6 +5,6 @@ export function deleteEmployee({ employeeId, reason }) {
     employeeId,
     deleted: true,
     reason: reason || "N/A",
-    deletedAt: new Date().toISOString(),
+    deletedAt: new Date().toISOString()
   };
 }

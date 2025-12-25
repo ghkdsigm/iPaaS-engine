@@ -12,8 +12,24 @@
       >
         <div style="font-weight: 600">#{{ r.id }}</div>
         <div style="margin-top: 6px">status: <b>{{ r.status }}</b></div>
-        <div style="margin-top: 8px; font-size: 12px; color: #666">{{ r.command?.raw }}</div>
+        <div style="margin-top: 8px; font-size: 12px; color: #666">
+          {{ r.command?.raw }}
+        </div>
+
+        <div v-if="r.steps?.length" style="margin-top: 10px">
+          <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px">Steps</div>
+          <div
+            v-for="s in r.steps"
+            :key="s.id"
+            style="font-size: 12px; padding: 6px 8px; border: 1px solid #eee; border-radius: 10px; margin-top: 6px"
+          >
+            <div><b>{{ s.index }}</b> · {{ s.tool }} · <b>{{ s.status }}</b></div>
+            <div v-if="s.error" style="color: #c00; margin-top: 4px">error: {{ s.error }}</div>
+          </div>
+        </div>
       </div>
+
+      <div v-if="!runs.length" style="margin-top: 12px; opacity: 0.7">No runs</div>
     </div>
   </div>
 </template>
@@ -26,7 +42,8 @@ const loading = ref(true);
 async function load() {
   loading.value = true;
   try {
-    runs.value = await $fetch(`${config.public.apiBase}/runs`);
+    const res: any = await $fetch(`${config.public.apiBase}/runs`);
+    runs.value = Array.isArray(res) ? res : (res?.runs ?? []);
   } finally {
     loading.value = false;
   }
