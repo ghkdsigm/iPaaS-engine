@@ -92,7 +92,7 @@ docker compose logs -f <서비스명>
 
 ## 구조
 
-company-automation/
+iPaaS-engine/
 ├─ apps/
 │  ├─ orchestrator/                     # 중앙 오케스트레이터 (NestJS)
 │  │  ├─ src/
@@ -110,7 +110,8 @@ company-automation/
 │  │  │  │  │  └─ roles.guard.ts
 │  │  │  │  ├─ logging/
 │  │  │  │  │  ├─ logger.module.ts
-│  │  │  │  │  └─ pino.logger.ts
+│  │  │  │  │  ├─ pino.logger.ts
+│  │  │  │  │  └─ audit.service.ts      # 감사 로깅
 │  │  │  │  └─ utils/
 │  │  │  │     ├─ mask.ts               # PII 마스킹
 │  │  │  │     └─ idempotency.ts        # idempotency key 생성
@@ -125,6 +126,7 @@ company-automation/
 │  │  │  │  ├─ tool-registry/           # 1) MCP tools 수집 + 표준화(메타/스키마)
 │  │  │  │  │  ├─ tool-registry.module.ts
 │  │  │  │  │  ├─ tool-registry.service.ts
+│  │  │  │  │  ├─ tool-registry.controller.ts
 │  │  │  │  │  ├─ tool-metadata.ts      # risk/roles/piiFields 등 표준 메타 타입
 │  │  │  │  │  ├─ schema/
 │  │  │  │  │  │  ├─ tool.schema.ts     # tool args/result schema 타입
@@ -184,33 +186,46 @@ company-automation/
 │  │  │  │  ├─ runs/                    # 8) 실행 이력 조회/모니터링 API
 │  │  │  │  │  ├─ runs.module.ts
 │  │  │  │  │  ├─ runs.controller.ts
-│  │  │  │  │  └─ runs.service.ts
-│  │  │  │  └─ command-api/             # 0) 진입점(자연어 명령 접수)
-│  │  │  │     ├─ command.module.ts
-│  │  │  │     ├─ command.controller.ts
-│  │  │  │     ├─ command.service.ts     # interpret → plan → policy → (approval/exe)
-│  │  │  │     └─ dto/
-│  │  │  │        ├─ create-command.dto.ts
-│  │  │  │        └─ command.response.dto.ts
-│  │  │  ├─ prisma/
-│  │  │  │  ├─ schema.prisma
-│  │  │  │  └─ migrations/
-│  │  │  └─ jobs/                        # (선택) 크론/정리 작업
-│  │  │     ├─ cleanup.job.ts
-│  │  │     └─ scheduler.module.ts
+│  │  │  │  │  ├─ runs.service.ts
+│  │  │  │  │  └─ health.controller.ts  # 헬스체크 엔드포인트
+│  │  │  │  ├─ command-api/             # 0) 진입점(자연어 명령 접수)
+│  │  │  │  │  ├─ command.module.ts
+│  │  │  │  │  ├─ command.controller.ts
+│  │  │  │  │  ├─ command.service.ts     # interpret → plan → policy → (approval/exe)
+│  │  │  │  │  └─ dto/
+│  │  │  │  │     └─ create-command.dto.ts
+│  │  │  │  └─ jobs/                    # (선택) 크론/정리 작업
+│  │  │  │     ├─ cleanup.job.ts
+│  │  │  │     └─ scheduler.module.ts
+│  │  │  └─ prisma/
+│  │  │     ├─ schema.prisma
+│  │  │     ├─ prisma.module.ts
+│  │  │     └─ migrations/
 │  │  ├─ test/
+│  │  │  ├─ idempotency.spec.ts
+│  │  │  └─ policy-engine.spec.ts
 │  │  ├─ package.json
 │  │  ├─ Dockerfile
-│  │  └─ README.md
+│  │  ├─ README.md
+│  │  ├─ jest.config.cjs
+│  │  ├─ nest-cli.json
+│  │  └─ tsconfig.json
 │  │
 │  ├─ frontend/                          # 관리 UI (Nuxt3/Vue3)
 │  │  ├─ pages/
+│  │  │  ├─ index.vue
 │  │  │  ├─ servers/                     # MCP 서버/툴 관리
+│  │  │  │  └─ index.vue
 │  │  │  ├─ workflows/                   # 워크플로우 빌더
+│  │  │  │  └─ index.vue
 │  │  │  ├─ approvals/                   # 승인 큐
+│  │  │  │  └─ index.vue
 │  │  │  └─ runs/                        # 실행 모니터링
+│  │  │     └─ index.vue
 │  │  ├─ components/
-│  │  └─ package.json
+│  │  ├─ package.json
+│  │  ├─ nuxt.config.ts
+│  │  └─ Dockerfile
 │  │
 │  └─ worker/                            # (선택) 무거운 작업 분리(같은 코드 공유 가능)
 │     ├─ src/
@@ -232,7 +247,8 @@ company-automation/
 │  │  │  │  ├─ tools.schema.ts          # args/result JSON schema
 │  │  │  │  └─ metadata.ts              # risk/roles/piiFields
 │  │  │  ├─ app.module.ts
-│  │  │  └─ main.ts
+│  │  │  ├─ main.ts
+│  │  │  └─ main.js
 │  │  ├─ package.json
 │  │  └─ Dockerfile
 │  │
