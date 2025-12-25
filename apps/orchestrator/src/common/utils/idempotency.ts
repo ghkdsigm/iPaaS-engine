@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import * as crypto from "crypto";
 
 export function makeIdempotencyKey(input: string) {
   return crypto.createHash("sha256").update(input).digest("hex");

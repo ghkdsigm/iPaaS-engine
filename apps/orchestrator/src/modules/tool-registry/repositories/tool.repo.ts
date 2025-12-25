@@ -1,18 +1,19 @@
-import { Global, Module } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 
-@Global()
-@Module({
-  providers: [
-    {
-      provide: PrismaClient,
-      useFactory: async () => {
-        const prisma = new PrismaClient();
-        await prisma.$connect();
-        return prisma;
-      }
-    }
-  ],
-  exports: [PrismaClient]
-})
-export class PrismaModule {}
+@Injectable()
+export class ToolRepo {
+  constructor(private prisma: PrismaClient) {}
+
+  findToolByName(name: string) {
+    return this.prisma.tool.findFirst({ where: { name }, include: { server: true } });
+  }
+
+  upsertToolServer(name: string, baseUrl: string) {
+    return this.prisma.toolServer.upsert({
+      where: { name },
+      create: { name, baseUrl },
+      update: { baseUrl }
+    });
+  }
+}

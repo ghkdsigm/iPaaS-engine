@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 import { DomainError } from "../../common/errors/domain.error";
 
 export type UserPayload = { id: string; name: string; roles: string[]; dept?: string };

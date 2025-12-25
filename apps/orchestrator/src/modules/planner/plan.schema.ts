@@ -1,18 +1,14 @@
 import { z } from "zod";
 
 export const PlanStepSchema = z.object({
-  tool: z.string().min(3),
-  args: z.record(z.any()),
-  riskLevel: z.enum(["LOW", "MEDIUM", "HIGH"]).default("LOW"),
-  timeoutMs: z.number().int().positive().max(120000).default(30000),
-  idempotencyKey: z.string().min(8).optional(),
-  expected: z.string().optional()
+  tool: z.string().min(1),
+  args: z.record(z.any()).default({}),
+  timeoutMs: z.number().int().positive().max(300000).optional(),
+  idempotencyKey: z.string().min(8).optional()
 });
 
 export const PlanSchema = z.object({
-  version: z.literal(1),
-  steps: z.array(PlanStepSchema).min(1),
-  notes: z.string().optional()
+  steps: z.array(PlanStepSchema).min(1)
 });
 
 export type PlanStep = z.infer<typeof PlanStepSchema>;

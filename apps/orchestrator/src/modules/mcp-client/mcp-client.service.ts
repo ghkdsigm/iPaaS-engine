@@ -7,7 +7,7 @@ export class McpClientService {
   readonly http = new HttpTransport();
   readonly discovery = new ServerDiscovery(this.http);
 
-  async execute(baseUrl: string, tool: string, args: any, timeoutMs: number = 30000) {
-    return this.http.postJson(new URL("/execute", baseUrl).toString(), { tool, args }, timeoutMs);
+  async execute(baseUrl: string, tool: string, args: any, timeoutMs?: number) {
+    return this.http.postJson(new URL("/execute", baseUrl).toString(), { tool, args }, timeoutMs || 15000);
   }
 }

@@ -6,10 +6,12 @@ import { PolicyEngineService } from "../policy/policy-engine.service";
 import { ToolRegistryService } from "../tool-registry/tool-registry.service";
 import { WorkflowEngineService } from "../workflow-engine/workflow-engine.service";
 import { maskBankAccount } from "../../common/utils/mask";
-import { makeIdempotencyKey } from "../../common/utils/idempotency";
-import { AuditService } from "../../common/logging/audit.service";
-import { PlanSchema } from "../planner/plan.schema";
-import { DomainError } from "../../common/errors/domain.error";
+import * as crypto from "crypto";
+
+function hashIdempotency(raw: string) {
+  const normalized = raw.trim().replace(/\s+/g, " ");
+  return crypto.createHash("sha256").update(normalized).digest("hex");
+}
 
 @Injectable()
 export class CommandService {
@@ -19,97 +21,78 @@ export class CommandService {
     private planner: PlannerService,
     private policy: PolicyEngineService,
     private registry: ToolRegistryService,
-    private workflow: WorkflowEngineService,
-    private audit: AuditService
+    private workflow: WorkflowEngineService
   ) {}
 
-  async create(command: string, actorId: string | null = null, userRoles: string[] = []) {
-    const idem = makeIdempotencyKey(command);
+  private async audit(type: string, meta: any) {
+    try {
+      await this.prisma.auditEvent.create({ data: { type, meta } });
+    } catch {}
+  }
 
-    // Idempotency: 같은 입력은 동일 Command를 재사용
-    const existing = await this.prisma.command.findUnique({
-      where: { idempotencyKey: idem },
-      include: { plan: { include: { approval: true } }, runs: true }
+  async create(command: string, providedIdempotencyKey?: string) {
+    const idempotencyKey = providedIdempotencyKey || hashIdempotency(command);
+
+    const existing = await this.prisma.command.findFirst({
+      where: { idempotencyKey },
+      include: { plan: true, runs: { orderBy: { createdAt: "desc" }, take: 1 } }
     });
 
     if (existing) {
-      await this.audit.record({
-        type: "COMMAND_IDEMPOTENT_REUSED",
-        actorId,
-        commandId: existing.id,
-        planId: existing.plan?.id || null,
-        payload: { idempotencyKey: idem }
-      });
-
-      const latestRun = [...existing.runs].sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))[0];
+      await this.audit("COMMAND_DEDUPED", { commandId: existing.id, idempotencyKey });
+      const latestRun = existing.runs?.[0];
       if (latestRun?.status === "SUCCESS") {
-        return { ok: true, status: "ALREADY_EXECUTED", commandId: existing.id, planId: existing.plan?.id, runId: latestRun.id, maskedCommand: existing.maskedRaw };
+        return { ok: true, status: "ALREADY_EXECUTED", commandId: existing.id, planId: existing.plan?.id, runId: latestRun.id };
       }
-      if (existing.plan?.approval?.status === "PENDING") {
-        return { ok: true, status: "NEEDS_APPROVAL", commandId: existing.id, planId: existing.plan.id, approvalId: existing.plan.approval.id, maskedCommand: existing.maskedRaw, steps: (existing.plan.steps as any)?.steps || existing.plan.steps };
-      }
-      return { ok: true, status: "REUSED", commandId: existing.id, planId: existing.plan?.id, maskedCommand: existing.maskedRaw };
+      return { ok: true, status: "REUSED", commandId: existing.id, planId: existing.plan?.id, runId: latestRun?.id || null };
     }
 
-    const masked = maskBankAccount(command);
-    const cmd = await this.prisma.command.create({
-      data: { raw: command, maskedRaw: masked, idempotencyKey: idem, actorId }
-    });
+    const cmd = await this.prisma.command.create({ data: { raw: command, idempotencyKey } });
+    await this.audit("COMMAND_CREATED", { commandId: cmd.id, idempotencyKey });
 
-    await this.audit.record({ type: "COMMAND_RECEIVED", actorId, commandId: cmd.id, payload: { maskedRaw: masked } });
-
-    // Tool registry sync (MVP: hr only)
     await this.registry.ensureServer("hr");
     await this.registry.sync("hr");
 
     const spec = await this.interpreter.interpret(command);
-    await this.audit.record({ type: "SPEC_INTERPRETED", actorId, commandId: cmd.id, payload: { intent: spec.intent, entities: spec.entities, unknownFields: spec.unknownFields, confidence: spec.confidence } });
+    const plan = await this.planner.build(spec);
 
-    const plan = this.planner.build(spec);
-    const validatedPlan = PlanSchema.parse(plan);
-
-    const policy = this.policy.evaluate({ spec, planSteps: validatedPlan.steps, user: { roles: userRoles } });
-    await this.audit.record({ type: "POLICY_EVALUATED", actorId, commandId: cmd.id, payload: policy });
-
-    if (policy.decision === "DENIED") {
-      throw new DomainError("POLICY_DENIED", policy.reasons.join(" | "), 403);
+    // enrich steps with tool metadata for policy evaluation
+    const metas = [];
+    for (const s of plan.steps) {
+      const t = await this.registry.getToolByName(s.tool);
+      metas.push({ tool: s.tool, args: s.args, riskLevel: t.riskLevel, requiredRoles: t.requiredRoles, piiFields: t.piiFields });
     }
 
+    const policy = this.policy.evaluate({ spec, steps: metas, userRoles: ["hr"] });
+
     const planRow = await this.prisma.plan.create({
-      data: {
-        commandId: cmd.id,
-        steps: validatedPlan as any,
-        needsApproval: policy.decision === "NEEDS_APPROVAL"
-      }
+      data: { commandId: cmd.id, steps: plan.steps as any, needsApproval: policy.needsApproval }
     });
 
-    await this.audit.record({ type: "PLAN_CREATED", actorId, commandId: cmd.id, planId: planRow.id, payload: { steps: validatedPlan.steps.map(s => ({ tool: s.tool, risk: s.riskLevel })) } });
+    await this.audit("PLAN_CREATED", { commandId: cmd.id, planId: planRow.id, needsApproval: policy.needsApproval });
 
-    if (policy.decision === "NEEDS_APPROVAL") {
+    if (!policy.allowed) {
+      await this.audit("PLAN_DENIED", { commandId: cmd.id, planId: planRow.id, reason: policy.reason });
+      return { ok: false, status: "DENIED", commandId: cmd.id, planId: planRow.id, reason: policy.reason };
+    }
+
+    if (policy.needsApproval) {
       const approval = await this.prisma.approval.create({
-        data: { planId: planRow.id, status: "PENDING", reason: policy.reasons.join(" | ") || "Approval required" }
+        data: { planId: planRow.id, status: "PENDING", reason: policy.reason || "Approval required" }
       });
-      await this.audit.record({ type: "APPROVAL_CREATED", actorId, commandId: cmd.id, planId: planRow.id, payload: { approvalId: approval.id, reason: approval.reason } });
-
+      await this.audit("APPROVAL_CREATED", { approvalId: approval.id, planId: planRow.id });
       return {
         ok: true,
         status: "NEEDS_APPROVAL",
         commandId: cmd.id,
         planId: planRow.id,
         approvalId: approval.id,
-        maskedCommand: masked,
-        steps: validatedPlan.steps
+        maskedCommand: maskBankAccount(command),
+        steps: plan.steps
       };
     }
 
-    const exec = await this.workflow.executeOrResume({
-      actorId,
-      commandId: cmd.id,
-      planId: planRow.id,
-      steps: validatedPlan.steps,
-      piiResolver: (t) => this.interpreter.resolvePii(t)
-    });
-
+    const exec = await this.workflow.execute(cmd.id, planRow.id, plan.steps, t => this.interpreter.resolvePii(t));
     return { ok: true, status: "EXECUTED", runId: exec.runId, commandId: cmd.id, planId: planRow.id };
   }
 }

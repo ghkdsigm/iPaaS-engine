@@ -4,6 +4,6 @@ import { PiiVault } from "./pii.vault";
 
 @Module({
   providers: [InterpreterService, PiiVault],
-  exports: [InterpreterService, PiiVault]
+  exports: [InterpreterService]
 })
 export class InterpreterModule {}

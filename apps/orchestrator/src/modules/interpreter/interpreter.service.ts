@@ -1,27 +1,38 @@
 import { Injectable } from "@nestjs/common";
-import { z } from "zod";
 import { PiiVault } from "./pii.vault";
 import type { CommandSpec } from "./command-spec";
 
-const SalaryWon = z.number().int().positive().max(1_000_000_000);
-const KoreanName = z.string().min(2).max(4);
-
-function tryParseSalary(command: string) {
-  const m = command.match(/(\d{3,5})\s*만원/);
-  if (!m) return null;
-  const v = Number(m[1]) * 10000;
-  return SalaryWon.safeParse(v).success ? v : null;
+function extractKoreanName(command: string) {
+  const m = command.match(/([가-힣]{2,4})\s*(가|은|는)\s*(내일|오늘|모레)/);
+  return m ? m[1] : null;
 }
 
-function tryParseName(command: string) {
-  const m = command.match(/([가-힣]{2,4})\s*(가|은|는)\s*내일/);
-  if (!m) return null;
-  return KoreanName.safeParse(m[1]).success ? m[1] : null;
+function extractDept(command: string) {
+  if (/개발/.test(command)) return "개발팀";
+  if (/인사/.test(command)) return "인사팀";
+  if (/영업/.test(command)) return "영업팀";
+  return "미지정";
 }
 
-function tryParseBank(command: string) {
-  const m = command.match(/\b\d{2,3}-\d{2,4}-\d{5,}\b/);
-  return m ? m[0] : null;
+function extractStart(command: string) {
+  if (/내일/.test(command)) return "TOMORROW";
+  if (/오늘/.test(command)) return "TODAY";
+  return "UNKNOWN";
+}
+
+function extractSalaryWon(command: string) {
+  const m = command.match(/연봉\s*([0-9]{3,7})\s*만?\s*원/);
+  if (!m) return null;
+  const num = Number(m[1]);
+  if (Number.isNaN(num)) return null;
+  // if "5000만원" -> 5000 * 10000
+  if (/만/.test(command)) return num * 10000;
+  return num;
+}
+
+function extractBankAccount(command: string) {
+  const bank = command.match(/\d{2,3}-\d{2,4}-\d{5,}/);
+  return bank ? bank[0] : null;
 }
 
 @Injectable()
@@ -31,52 +42,27 @@ export class InterpreterService {
   async interpret(command: string): Promise<CommandSpec> {
     const entities: Record<string, any> = {};
     const piiTokens: Record<string, string> = {};
-    const confidence: Record<string, number> = {};
-    const unknownFields: string[] = [];
 
-    const bank = tryParseBank(command);
+    const bank = extractBankAccount(command);
     if (bank) {
       const token = await this.vault.put(bank);
       piiTokens.bankAccount = token;
       entities.bankAccountToken = token;
-      confidence.bankAccountToken = 0.95;
     }
 
-    const salaryWon = tryParseSalary(command);
-    if (salaryWon !== null) {
-      entities.salaryWon = salaryWon;
-      confidence.salaryWon = 0.8;
-    } else {
-      unknownFields.push("salaryWon");
-    }
+    const salary = extractSalaryWon(command);
+    if (salary !== null) entities.salaryWon = salary;
 
-    const name = tryParseName(command);
-    if (name) {
-      entities.name = name;
-      confidence.name = 0.8;
-    } else {
-      unknownFields.push("name");
-    }
+    const name = extractKoreanName(command);
+    if (name) entities.name = name;
 
-    if (/개발/.test(command)) {
-      entities.dept = "개발팀";
-      confidence.dept = 0.7;
-    } else if (/영업/.test(command)) {
-      entities.dept = "영업팀";
-      confidence.dept = 0.7;
-    } else {
-      entities.dept = "미지정";
-      confidence.dept = 0.4;
-      unknownFields.push("dept");
-    }
+    entities.dept = extractDept(command);
+    entities.start = extractStart(command);
 
-    entities.start = /내일/.test(command) ? "TOMORROW" : "UNKNOWN";
-    confidence.start = entities.start === "TOMORROW" ? 0.7 : 0.3;
-
-    return { intent: "NATURAL_COMMAND", entities, piiTokens, confidence, unknownFields };
+    return { intent: "NATURAL_COMMAND", entities, piiTokens };
   }
 
   async resolvePii(token: string) {
-    return this.vault.get(token);
+    return await this.vault.get(token);
   }
 }

@@ -1,7 +1,5 @@
 export type CommandSpec = {
-  intent: "NATURAL_COMMAND";
+  intent: string;
   entities: Record<string, any>;
   piiTokens: Record<string, string>;
-  confidence?: Record<string, number>;
-  unknownFields?: string[];
 };

@@ -1,5 +1,11 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model ToolServer {
   id        String   @id @default(cuid())
@@ -28,13 +34,10 @@ model Tool {
 model Command {
   id             String   @id @default(cuid())
   raw            String
-  maskedRaw      String?
-  idempotencyKey String   @unique
-  actorId        String?
-  createdAt      DateTime @default(now())
-  plan           Plan?
-  runs           Run[]
-  auditEvents    AuditEvent[]
+  idempotencyKey String?  @unique
+  createdAt DateTime @default(now())
+  plan      Plan?
+  runs      Run[]
 }
 
 model Plan {
@@ -68,22 +71,14 @@ model Run {
   command    Command @relation(fields: [commandId], references: [id], onDelete: Cascade)
 }
 
-model Step {
-  id         String   @id @default(cuid())
-  runId      String
-  index      Int
-  tool       String
-  args       Json
-  idempotencyKey String?
-  status     String   @default("PENDING")
-  result     Json?
-  error      String?
-  createdAt  DateTime @default(now())
-  finishedAt DateTime?
-  run        Run @relation(fields: [runId], references: [id], onDelete: Cascade)
-  @@unique([runId, index])
-}
 
+model PiiSecret {
+  token      String   @id
+  cipherText String
+  iv         String
+  tag        String
+  createdAt  DateTime @default(now())
+}
 
 model AuditEvent {
   id        String   @id @default(cuid())
@@ -92,20 +87,22 @@ model AuditEvent {
   planId    String?
   runId     String?
   stepId    String?
-  actorId   String?
-  payload   Json?
+  message   String?
+  meta      Json?
   createdAt DateTime @default(now())
-
-  command   Command? @relation(fields: [commandId], references: [id], onDelete: Cascade)
-  @@index([type, createdAt])
-  @@index([commandId])
-  @@index([runId])
 }
 
-model PiiSecret {
-  token      String   @id
-  cipherText String
-  iv         String
-  tag        String
+model Step {
+  id         String   @id @default(cuid())
+  runId      String
+  index      Int
+  tool       String
+  args       Json
+  status     String   @default("PENDING")
+  result     Json?
+  error      String?
   createdAt  DateTime @default(now())
+  finishedAt DateTime?
+  run        Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@unique([runId, index])
 }

@@ -1,41 +1,60 @@
-type JsonSchema = {
-  type?: string;
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  enum?: any[];
-};
+import Ajv, { type ErrorObject } from "ajv";
+import addFormats from "ajv-formats";
 
-function typeOk(expected: string | undefined, v: any) {
-  if (!expected) return true;
-  if (expected === "string") return typeof v === "string";
-  if (expected === "number") return typeof v === "number" && Number.isFinite(v);
-  if (expected === "integer") return typeof v === "number" && Number.isInteger(v);
-  if (expected === "boolean") return typeof v === "boolean";
-  if (expected === "object") return typeof v === "object" && v !== null && !Array.isArray(v);
-  if (expected === "array") return Array.isArray(v);
-  return true;
+const ajv = new Ajv({
+  allErrors: true,
+  strict: false,
+  coerceTypes: true,
+  removeAdditional: false
+});
+addFormats(ajv);
+
+const compiled = new Map<string, ReturnType<Ajv["compile"]>>();
+
+function stableKey(schema: any) {
+  try {
+    return JSON.stringify(schema);
+  } catch {
+    return String(schema);
+  }
+}
+
+function formatErrors(errors: ErrorObject[] | null | undefined) {
+  if (!errors || errors.length === 0) return "Invalid arguments";
+  return errors
+    .slice(0, 10)
+    .map((e) => {
+      const path = e.instancePath || "(root)";
+      const msg = e.message || "invalid";
+      return `${path}: ${msg}`;
+    })
+    .join("; ");
 }
 
 export function validateArgs(schema: any, args: any): { ok: boolean; error?: string } {
   if (!schema) return { ok: true };
 
-  const s = schema as JsonSchema;
-  if (s.type && !typeOk(s.type, args)) return { ok: false, error: `Expected ${s.type}` };
-
-  if (s.enum && !s.enum.includes(args)) return { ok: false, error: `Value not in enum` };
-
-  if (s.type === "object") {
-    const req = s.required || [];
-    for (const k of req) {
-      if (args?.[k] === undefined) return { ok: false, error: `Missing required: ${k}` };
-    }
-    const props = s.properties || {};
-    for (const [k, ps] of Object.entries(props)) {
-      if (args?.[k] === undefined) continue;
-      if (ps.type && !typeOk(ps.type, args[k])) return { ok: false, error: `Invalid type for ${k}` };
-      if (ps.enum && !ps.enum.includes(args[k])) return { ok: false, error: `Invalid enum for ${k}` };
+  let jsonSchema = schema;
+  if (typeof schema === "string") {
+    try {
+      jsonSchema = JSON.parse(schema);
+    } catch {
+      return { ok: false, error: "argsSchema is not valid JSON" };
     }
   }
 
+  const key = stableKey(jsonSchema);
+  let validate = compiled.get(key);
+  if (!validate) {
+    try {
+      validate = ajv.compile(jsonSchema);
+      compiled.set(key, validate);
+    } catch (e: any) {
+      return { ok: false, error: `argsSchema compile failed: ${e?.message || String(e)}` };
+    }
+  }
+
+  const ok = validate(args) as boolean;
+  if (!ok) return { ok: false, error: formatErrors(validate.errors) };
   return { ok: true };
 }

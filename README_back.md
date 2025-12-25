@@ -24,6 +24,12 @@ Open:
 
 
 
+# 도커
+
+docker compose down
+docker compose build --no-cache orchestrator
+docker compose up -d
+docker compose logs -f orchestrator
 
 
 

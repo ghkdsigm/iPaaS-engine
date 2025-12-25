@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-company_pw}
       POSTGRES_DB: ${POSTGRES_DB:-company_automation}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -34,6 +34,9 @@ services:
       PORT: ${ORCHESTRATOR_PORT:-3001}
       DATABASE_URL: ${DATABASE_URL:-postgresql://company:company_pw@postgres:5432/company_automation?schema=public}
       HR_MCP_BASE_URL: http://hr-mcp-server:${HR_MCP_PORT:-4001}
+      PII_VAULT_KEY: ${PII_VAULT_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-3-5-sonnet-20241022}
       JWT_SECRET: ${JWT_SECRET:-dev_secret_change_me}
     depends_on:
       postgres:

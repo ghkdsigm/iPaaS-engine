@@ -3,8 +3,6 @@ import { PrismaClient } from "@prisma/client";
 import { WorkflowEngineService } from "../workflow-engine/workflow-engine.service";
 import { ToolRegistryService } from "../tool-registry/tool-registry.service";
 import { InterpreterService } from "../interpreter/interpreter.service";
-import { AuditService } from "../../common/logging/audit.service";
-import { PlanSchema } from "../planner/plan.schema";
 
 @Injectable()
 export class ApprovalsService {
@@ -12,8 +10,7 @@ export class ApprovalsService {
     private prisma: PrismaClient,
     private workflow: WorkflowEngineService,
     private registry: ToolRegistryService,
-    private interpreter: InterpreterService,
-    private audit: AuditService
+    private interpreter: InterpreterService
   ) {}
 
   async list() {
@@ -21,27 +18,15 @@ export class ApprovalsService {
       orderBy: { createdAt: "desc" },
       include: { plan: { include: { command: true } } }
     });
-
-    return {
-      approvals: approvals.map((a) => ({
-        id: a.id,
-        status: a.status,
-        reason: a.reason,
-        createdAt: a.createdAt,
-        resolvedAt: a.resolvedAt,
-        planId: a.planId,
-        commandId: a.plan.commandId,
-        maskedCommand: a.plan.command.maskedRaw
-      }))
-    };
+    return { approvals };
   }
 
-  async approve(id: string, actorId: string | null = null) {
+  async approve(id: string) {
     const approval = await this.prisma.approval.findUnique({
       where: { id },
       include: { plan: { include: { command: true } } }
     });
-    if (!approval) return { ok: false };
+    if (!approval) return { ok: false, error: "NOT_FOUND" };
     if (approval.status !== "PENDING") return { ok: true, status: approval.status };
 
     await this.prisma.approval.update({
@@ -49,47 +34,23 @@ export class ApprovalsService {
       data: { status: "APPROVED", resolvedAt: new Date() }
     });
 
-    await this.audit.record({
-      type: "APPROVAL_RESOLVED",
-      actorId,
-      commandId: approval.plan.commandId,
-      planId: approval.planId,
-      payload: { approvalId: id, status: "APPROVED" }
-    });
-
+    await this.registry.ensureServer("hr");
     await this.registry.sync("hr");
 
-    const parsed = PlanSchema.parse(approval.plan.steps as any);
-    const exec = await this.workflow.executeOrResume({
-      actorId,
-      commandId: approval.plan.commandId,
-      planId: approval.planId,
-      steps: parsed.steps,
-      piiResolver: (t) => this.interpreter.resolvePii(t)
-    });
-
+    const steps = approval.plan.steps as any[];
+    const exec = await this.workflow.execute(approval.plan.commandId, approval.planId, steps, t => this.interpreter.resolvePii(t));
     return { ok: true, runId: exec.runId };
   }
 
-  async reject(id: string, actorId: string | null = null, reason: string = "Rejected") {
-    const approval = await this.prisma.approval.findUnique({
-      where: { id },
-      include: { plan: true }
-    });
+  async reject(id: string) {
+    const approval = await this.prisma.approval.findUnique({ where: { id } });
+    if (!approval) return { ok: false, error: "NOT_FOUND" };
+    if (approval.status !== "PENDING") return { ok: true, status: approval.status };
 
     await this.prisma.approval.update({
       where: { id },
-      data: { status: "REJECTED", resolvedAt: new Date(), reason }
+      data: { status: "REJECTED", resolvedAt: new Date() }
     });
-
-    await this.audit.record({
-      type: "APPROVAL_RESOLVED",
-      actorId,
-      commandId: approval?.plan.commandId || null,
-      planId: approval?.planId || null,
-      payload: { approvalId: id, status: "REJECTED", reason }
-    });
-
     return { ok: true };
   }
 }

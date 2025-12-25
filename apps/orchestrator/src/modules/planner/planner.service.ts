@@ -1,46 +1,61 @@
 import { Injectable } from "@nestjs/common";
-import crypto from "crypto";
 import type { CommandSpec } from "../interpreter/command-spec";
+import { ToolRegistryService } from "../tool-registry/tool-registry.service";
+import { AnthropicService } from "./llm/anthropic.service";
 import { PlanSchema, type Plan } from "./plan.schema";
 
-function stepKey(tool: string, args: any) {
-  return crypto.createHash("sha256").update(tool + ":" + JSON.stringify(args)).digest("hex");
+function defaultPlan(spec: CommandSpec): Plan {
+  const name = spec.entities.name || "신규입사자";
+  return PlanSchema.parse({
+    steps: [
+      { tool: "hr.generate_employee_id", args: { name } },
+      {
+        tool: "hr.create_employee_account",
+        args: {
+          employeeId: "{{step0.employeeId}}",
+          name,
+          dept: spec.entities.dept,
+          startDate: spec.entities.start,
+          salary: spec.entities.salaryWon,
+          bankAccountToken: spec.entities.bankAccountToken
+        },
+        timeoutMs: 15000
+      }
+    ]
+  });
 }
 
 @Injectable()
 export class PlannerService {
-  build(spec: CommandSpec): Plan {
-    const name = spec.entities.name ?? "UNKNOWN";
-    const dept = spec.entities.dept ?? "미지정";
-    const salaryWon = spec.entities.salaryWon ?? null;
-    const startDate = spec.entities.start ?? "UNKNOWN";
-    const bankAccountToken = spec.entities.bankAccountToken ?? null;
+  constructor(private registry: ToolRegistryService, private llm: AnthropicService) {}
 
-    // 운영형 원칙:
-    // - Planner는 정형 Plan(JSON)만 반환
-    // - 실행은 WorkflowEngine이 담당
-    const plan: Plan = {
-      version: 1,
-      steps: [
-        {
-          tool: "hr.generate_employee_id",
-          args: { name, dept },
-          riskLevel: "LOW",
-          expected: "employeeId"
-        },
-        {
-          tool: "hr.create_employee_account",
-          args: { name, dept, startDate, salaryWon, bankAccountToken, employeeId: "{{step0.employeeId}}" },
-          riskLevel: "HIGH",
-          expected: "employeeAccountId"
-        }
-      ],
-      notes: "Planner는 현재 MVP 템플릿 기반입니다. 운영에서는 템플릿/DSL + 승인/정책으로 통제합니다."
+  async build(spec: CommandSpec): Promise<Plan> {
+    const tools = await this.registry.list();
+    const catalog = tools.tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      riskLevel: t.riskLevel,
+      requiredRoles: t.requiredRoles,
+      piiFields: t.piiFields,
+      argsSchema: t.argsSchema
+    }));
+
+    const planJson = await this.llm.planJSON({ spec, toolCatalog: catalog });
+    if (!planJson) return defaultPlan(spec);
+
+    // allowlist: filter to known tool names only
+    const allowed = new Set(catalog.map(t => t.name));
+    const sanitized = {
+      steps: Array.isArray(planJson.steps)
+        ? planJson.steps.filter((s: any) => s && typeof s.tool === "string" && allowed.has(s.tool)).map((s: any) => ({
+            tool: s.tool,
+            args: s.args && typeof s.args === "object" ? s.args : {},
+            timeoutMs: typeof s.timeoutMs === "number" ? s.timeoutMs : undefined
+          }))
+        : []
     };
 
-    // step별 idempotencyKey 부여(재실행/재시도 안전)
-    plan.steps = plan.steps.map((s) => ({ ...s, idempotencyKey: stepKey(s.tool, s.args) }));
-
-    return PlanSchema.parse(plan);
+    if (sanitized.steps.length === 0) return defaultPlan(spec);
+    return PlanSchema.parse(sanitized);
   }
 }

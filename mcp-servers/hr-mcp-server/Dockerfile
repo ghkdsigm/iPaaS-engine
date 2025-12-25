@@ -1,6 +1,13 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json* ./
+
+COPY package.json ./
 RUN npm install --silent
+
 COPY src ./src
-CMD ["npm","run","start"]
+
+ENV NODE_ENV=production
+ENV PORT=4001
+EXPOSE 4001
+
+CMD ["node", "src/main.js"]

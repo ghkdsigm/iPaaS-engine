@@ -16,28 +16,40 @@ export type AuditType =
   | "RUN_SUCCEEDED"
   | "RUN_FAILED";
 
+export type AuditInput = {
+  type: AuditType;
+  actorId?: string | null;
+  commandId?: string | null;
+  planId?: string | null;
+  runId?: string | null;
+  stepId?: string | null;
+  message?: string | null;
+  payload?: unknown;
+};
+
 @Injectable()
 export class AuditService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
-  async record(input: {
-    type: AuditType;
-    actorId?: string | null;
-    commandId?: string | null;
-    planId?: string | null;
-    runId?: string | null;
-    stepId?: string | null;
-    payload?: any;
-  }) {
+  async emit(input: AuditInput) {
+    const hasMeta = input.actorId !== undefined || input.payload !== undefined;
+
+    const meta = hasMeta
+      ? {
+          actorId: input.actorId ?? null,
+          payload: input.payload ?? null
+        }
+      : undefined;
+
     await this.prisma.auditEvent.create({
       data: {
         type: input.type,
-        actorId: input.actorId || null,
-        commandId: input.commandId || null,
-        planId: input.planId || null,
-        runId: input.runId || null,
-        stepId: input.stepId || null,
-        payload: input.payload ?? null
+        commandId: input.commandId ?? null,
+        planId: input.planId ?? null,
+        runId: input.runId ?? null,
+        stepId: input.stepId ?? null,
+        message: input.message ?? null,
+        ...(meta !== undefined ? { meta } : {})
       }
     });
   }

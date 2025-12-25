@@ -2,11 +2,7 @@ import { Body, Controller, Post } from "@nestjs/common";
 import { z } from "zod";
 import { CommandService } from "./command.service";
 
-const Schema = z.object({
-  command: z.string().min(1),
-  actorId: z.string().optional(),
-  roles: z.array(z.string()).optional()
-});
+const Schema = z.object({ command: z.string().min(1), idempotencyKey: z.string().min(8).optional() });
 
 @Controller("commands")
 export class CommandController {
@@ -15,6 +11,6 @@ export class CommandController {
   @Post()
   create(@Body() body: any) {
     const parsed = Schema.parse(body);
-    return this.svc.create(parsed.command, parsed.actorId || null, parsed.roles || []);
+    return this.svc.create(parsed.command, parsed.idempotencyKey);
   }
 }

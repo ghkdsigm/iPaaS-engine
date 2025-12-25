@@ -1,9 +1,9 @@
 export class HttpTransport {
-  async getJson(url: string, timeoutMs: number = 10000) {
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), timeoutMs);
+  async getJson(url: string, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const r = await fetch(url, { signal: ac.signal });
+      const r = await fetch(url, { signal: controller.signal });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
     } finally {
@@ -11,15 +11,15 @@ export class HttpTransport {
     }
   }
 
-  async postJson(url: string, body: any, timeoutMs: number = 10000) {
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), timeoutMs);
+  async postJson(url: string, body: any, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        signal: ac.signal
+        signal: controller.signal
       });
       const json = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(json?.error ? JSON.stringify(json.error) : `HTTP ${r.status}`);

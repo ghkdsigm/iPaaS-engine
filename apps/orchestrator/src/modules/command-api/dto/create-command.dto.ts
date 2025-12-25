@@ -1,1 +1,1 @@
-export type CreateCommandDto = { command: string };
+export type CreateCommandDto = { command: string; idempotencyKey?: string };
