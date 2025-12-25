@@ -26,11 +26,15 @@ model Tool {
 }
 
 model Command {
-  id        String   @id @default(cuid())
-  raw       String
-  createdAt DateTime @default(now())
-  plan      Plan?
-  runs      Run[]
+  id             String   @id @default(cuid())
+  raw            String
+  maskedRaw      String?
+  idempotencyKey String   @unique
+  actorId        String?
+  createdAt      DateTime @default(now())
+  plan           Plan?
+  runs           Run[]
+  auditEvents    AuditEvent[]
 }
 
 model Plan {
@@ -70,6 +74,7 @@ model Step {
   index      Int
   tool       String
   args       Json
+  idempotencyKey String?
   status     String   @default("PENDING")
   result     Json?
   error      String?
@@ -77,4 +82,30 @@ model Step {
   finishedAt DateTime?
   run        Run @relation(fields: [runId], references: [id], onDelete: Cascade)
   @@unique([runId, index])
+}
+
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  type      String
+  commandId String?
+  planId    String?
+  runId     String?
+  stepId    String?
+  actorId   String?
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  command   Command? @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  @@index([type, createdAt])
+  @@index([commandId])
+  @@index([runId])
+}
+
+model PiiSecret {
+  token      String   @id
+  cipherText String
+  iv         String
+  tag        String
+  createdAt  DateTime @default(now())
 }
