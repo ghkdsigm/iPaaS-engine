@@ -9,6 +9,7 @@
     "start": "nuxt start --host 0.0.0.0 --port 3000"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "nuxt": "^3.13.2"
   },
   "devDependencies": {

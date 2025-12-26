@@ -31,6 +31,16 @@ docker compose build --no-cache orchestrator
 docker compose up -d
 docker compose logs -f orchestrator
 
+-------------------------------------------
+docker compose down
+
+# 프론트 이미지/캐시를 확실히 갱신하려면 build를 강제로
+docker compose build --no-cache frontend
+
+docker compose up -d
+docker compose logs -f frontend
+-------------------------------------------
+
 
 
 
