@@ -1,4 +1,6 @@
 /* 믹스인 */
+@use 'variables' as *;
+
 @mixin button-base {
   height: 38px;
   padding: 0 14px;

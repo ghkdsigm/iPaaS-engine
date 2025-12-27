@@ -1,7 +1,7 @@
 /* 메인 스타일 파일 */
-@import 'reset';
-@import 'variables';
-@import 'mixins';
+@use 'reset';
+@use 'variables' as *;
+@use 'mixins' as *;
 
 /* 전역 스타일 */
 body {
