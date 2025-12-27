@@ -2,17 +2,13 @@ import type { EventDefinition } from "./event.types";
 
 export const EVENT_DEFINITIONS: Record<string, EventDefinition> = {
   "hr.generate_employee_id": {
-    description: "Generate an employee id for a new hire",
+    description: "Generate employee id for a new hire",
     serverHint: "hr",
     slots: [
-      { name: "name", required: true, type: "person", question: "입사자 이름이 누구인가요?" },
-      { name: "startDate", required: false, type: "date", question: "입사일이 언제인가요? (예: 내일, 2025-12-27)" },
-      { name: "team", required: false, type: "string", question: "배치될 팀/부서를 알려주세요. (예: 개발팀)" }
+      { name: "name", required: true, type: "person", question: "입사자 이름이 누구인가요?" }
     ],
     argMap: {
-      name: "name",
-      startDate: "startDate",
-      team: "team"
+      name: "name"
     }
   },
 

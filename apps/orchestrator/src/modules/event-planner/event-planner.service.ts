@@ -2,7 +2,8 @@ import { Injectable } from "@nestjs/common";
 import type { EventIntent, EventType, MissingSlot } from "../eventing/event.types";
 import { ToolRegistryService } from "../tool-registry/tool-registry.service";
 import { validateArgs } from "../tool-registry/schema/schema.validator";
-import { argKeyFor } from "../eventing/event.registry";
+import { EVENT_DEFINITIONS, argKeyFor } from "../eventing/event.registry";
+
 
 export type StepDraft = { tool: string; args: any; timeoutMs?: number };
 
@@ -22,17 +23,22 @@ function shallowClone<T>(v: T): T {
 }
 
 function buildArgsFromSlots(eventType: EventType, slots: Record<string, any>) {
+  const def = EVENT_DEFINITIONS[eventType];
   const args: Record<string, any> = {};
+
+  const allowedSlotNames = def?.argMap ? new Set(Object.keys(def.argMap)) : null;
+
   for (const [k, v] of Object.entries(slots || {})) {
+    if (allowedSlotNames && !allowedSlotNames.has(k)) continue;
     const argKey = argKeyFor(eventType, k);
     args[argKey] = v;
   }
 
-  // Common aliases (helps when tools keep legacy arg names)
   if (eventType === "payroll.pay") {
-    if (slots.payee && args.employeeName === undefined) args.employeeName = slots.payee;
+    if (slots.payee && args.name === undefined) args.name = slots.payee;
     if (slots.amountWon && args.amountWon === undefined) args.amountWon = slots.amountWon;
   }
+
   return args;
 }
 

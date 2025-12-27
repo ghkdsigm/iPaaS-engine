@@ -150,6 +150,9 @@ function slotValueFor(eventType: EventType, slot: string, raw: string) {
 
 function buildMissingSlots(event: EventIntent): MissingSlot[] {
   const def = EVENT_DEFINITIONS[event.type];
+  if (!def) {
+    return [];
+  }
   const missing: MissingSlot[] = [];
 
   for (const s of def.slots) {
@@ -192,6 +195,10 @@ export class EventInterpreterService {
 
     for (const type of types) {
       const def = EVENT_DEFINITIONS[type];
+      if (!def) {
+        // Skip unknown event types
+        continue;
+      }
       const id = randomUUID();
       const slots: Record<string, any> = {};
 
