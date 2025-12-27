@@ -3,11 +3,10 @@ import { ApprovalsController } from "./approvals.controller";
 import { ApprovalsService } from "./approvals.service";
 import { WorkflowEngineModule } from "../workflow-engine/workflow-engine.module";
 import { ToolRegistryModule } from "../tool-registry/tool-registry.module";
-import { InterpreterModule } from "../interpreter/interpreter.module";
 
 @Module({
-  imports: [WorkflowEngineModule, ToolRegistryModule, InterpreterModule],
+  imports: [WorkflowEngineModule, ToolRegistryModule],
   controllers: [ApprovalsController],
-  providers: [ApprovalsService],
+  providers: [ApprovalsService]
 })
 export class ApprovalsModule {}

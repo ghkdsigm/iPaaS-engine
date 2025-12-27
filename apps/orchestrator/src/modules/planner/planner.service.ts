@@ -75,7 +75,8 @@ export class PlannerService {
   constructor(
     private registry: ToolRegistryService,
     private llm: AnthropicService
-  ) {}
+  ) {
+    throw new Error("LEGACY_PLANNER_DISABLED: Use EventInterpreter/EventPlanner pipeline. Remove PlannerModule imports.");}
 
   async build(spec: CommandSpec): Promise<Plan> {
     const tools = await this.registry.list();

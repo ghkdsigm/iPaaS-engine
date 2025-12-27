@@ -37,7 +37,8 @@ function extractBankAccount(command: string) {
 
 @Injectable()
 export class InterpreterService {
-  constructor(private vault: PiiVault) {}
+  constructor(private vault: PiiVault) {
+    throw new Error("LEGACY_INTERPRETER_DISABLED: Use EventInterpreterService.parse(). Remove InterpreterModule imports.");}
 
   async interpret(command: string): Promise<CommandSpec> {
     const entities: Record<string, any> = {};

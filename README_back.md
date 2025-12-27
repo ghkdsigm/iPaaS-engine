@@ -42,6 +42,49 @@ docker compose logs -f frontend
 -------------------------------------------
 
 
+#제대로 재시작(가장 확실한 방법) (DB까지 초기화 포함)
+
+docker compose down -v
+
+docker compose build --no-cache orchestrator hr-mcp finance-mcp dispatch-mcp ledger-mcp frontend nginx
+
+docker compose up -d
+
+docker compose logs -f orchestrator
+
+
+-------------------------------------------
+
+#DB는 유지하고 “코드만” 확실히 바꾸고 싶으면
+docker compose down
+
+docker compose build --no-cache orchestrator hr-mcp finance-mcp dispatch-mcp ledger-mcp
+
+docker compose up -d
+
+docker compose logs -f orchestrator
+
+
+또는
+
+docker compose down
+
+docker compose build --no-cache
+
+docker compose up -d --force-recreate
+
+docker compose ps
+
+
+-------------------------------------------
+
+
+#db싹 사라지면
+
+docker compose exec -T orchestrator sh -lc "npx prisma db push --schema=src/prisma/schema.prisma && npx prisma generate --schema=src/prisma/schema.prisma"
+docker compose restart orchestrator
+
+
 
 
 ## 구조

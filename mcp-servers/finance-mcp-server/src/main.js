@@ -6,66 +6,73 @@ app.use(express.json());
 
 const PORT = Number(process.env.PORT || 4011);
 
-const PaySalaryArgs = z.object({
-  date: z.string().min(1),
-  employeeName: z.string().min(1),
-  amountWon: z.number().positive()
-});
-
 const tools = [
   {
     name: "finance.pay_salary",
-    description: "Pay salary to an employee (requires approval)",
+    description: "Execute a salary payment (simulation). Requires approval in most orgs.",
     riskLevel: "HIGH",
-    requiredRoles: ["FINANCE_ADMIN"],
-    piiFields: [],
-    tags: ["primary", "event:payroll.pay", "domain:finance"],
+    requiredRoles: ["FINANCE", "ADMIN"],
+    piiFields: ["name", "bankAccount"],
+    tags: ["event:payroll.pay", "primary"],
     eventTypes: ["payroll.pay"],
     argsSchema: {
       type: "object",
+      additionalProperties: false,
+      required: ["name", "amountWon", "date"],
       properties: {
-        date: { type: "string" },
-        employeeName: { type: "string" },
-        amountWon: { type: "number" }
-      },
-      required: ["date", "employeeName", "amountWon"],
-      additionalProperties: false
+        name: { type: "string", minLength: 1 },
+        amountWon: { type: "integer", minimum: 1 },
+        date: { type: "string", minLength: 1 },
+        memo: { type: "string" }
+      }
     }
   }
 ];
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "finance-mcp-server", time: new Date().toISOString() });
-});
+app.get("/health", (_req, res) => res.json({ ok: true, service: "finance-mcp-server" }));
+app.get("/tools", (_req, res) => res.json({ tools }));
 
-app.get("/tools", (_req, res) => {
-  res.json({ tools });
-});
+const ExecuteBodySchema = z
+  .object({
+    tool: z.string(),
+    args: z.record(z.any()).optional()
+  })
+  .passthrough();
 
-app.post(["/execute", "/invoke"], async (req, res) => {
-  const tool = typeof req.body?.tool === "string" ? req.body.tool : "";
-  const args = req.body?.args ?? {};
-
-  try {
-    if (tool === "finance.pay_salary") {
-      const parsed = PaySalaryArgs.safeParse(args);
-      if (!parsed.success) return res.status(400).json({ ok: false, error: parsed.error.flatten() });
-
-      const result = {
-        transactionId: `tx_${Date.now()}`,
-        status: "SENT",
-        paidAt: new Date().toISOString(),
-        ...parsed.data
-      };
-
-      return res.json({ ok: true, result });
-    }
-
-    return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return res.status(500).json({ ok: false, error: message });
+app.post(["/execute", "/invoke"], (req, res) => {
+  const parsed = ExecuteBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, error: parsed.error.flatten() });
   }
+
+  const tool = parsed.data.tool;
+  const args = parsed.data.args || {};
+
+  if (tool !== "finance.pay_salary") {
+    return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
+  }
+
+  const name = typeof args.name === "string" ? args.name.trim() : "";
+  const date = typeof args.date === "string" ? args.date.trim() : "";
+  const amountWon = typeof args.amountWon === "number" ? args.amountWon : Number(args.amountWon);
+
+  if (!name) return res.status(400).json({ ok: false, error: "name is required" });
+  if (!date) return res.status(400).json({ ok: false, error: "date is required" });
+  if (!Number.isFinite(amountWon) || amountWon <= 0) return res.status(400).json({ ok: false, error: "amountWon must be a positive number" });
+
+  const paymentId = `PAY-${Date.now()}`;
+
+  return res.json({
+    ok: true,
+    result: {
+      paymentId,
+      name,
+      date,
+      amountWon,
+      memo: typeof args.memo === "string" ? args.memo : undefined,
+      simulated: true
+    }
+  });
 });
 
 app.listen(PORT, () => {

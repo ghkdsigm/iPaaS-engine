@@ -108,6 +108,22 @@ export class ToolRegistryService {
     return { tools };
   }
 
+  async getStepMetas(steps: { tool: string; args: any }[]) {
+    const out = [];
+    for (const s of steps) {
+      const tool = await this.prisma.tool.findFirst({ where: { name: s.tool } });
+      out.push({
+        tool: s.tool,
+        args: s.args,
+        riskLevel: tool?.riskLevel ?? "LOW",
+        requiredRoles: tool?.requiredRoles ?? [],
+        piiFields: tool?.piiFields ?? []
+      });
+    }
+    return out;
+  }
+  
+
   async getToolByName(name: string) {
     const tool = await this.prisma.tool.findFirst({ where: { name }, include: { server: true } });
     if (!tool) throw new DomainError("TOOL_NOT_FOUND", `Tool not found: ${name}`, 404);
@@ -162,4 +178,27 @@ export class ToolRegistryService {
 
     return arr;
   }
+
+  private _seeded = false;
+
+  async ensureSeeded() {
+    if (this._seeded) return;
+    const count = await this.prisma.tool.count();
+    if (count > 0) {
+      this._seeded = true;
+      return;
+    }
+
+    // Sync all known servers once so planning can work across domains.
+    for (const name of Object.keys(SERVER_ENV)) {
+      try {
+        await this.sync(name);
+      } catch {
+        // ignore per-server failures; other servers may still be available
+      }
+    }
+
+    this._seeded = true;
+  }
+
 }

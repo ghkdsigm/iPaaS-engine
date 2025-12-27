@@ -6,68 +6,75 @@ app.use(express.json());
 
 const PORT = Number(process.env.PORT || 4021);
 
-const AssignArgs = z.object({
-  date: z.string().min(1),
-  assignee: z.string().min(1),
-  loadValueWon: z.number().optional(),
-  memo: z.string().optional()
-});
-
 const tools = [
   {
-    name: "dispatch.assign",
-    description: "Assign a dispatch/job to a driver/staff",
-    riskLevel: "LOW",
-    requiredRoles: ["DISPATCH"],
-    piiFields: [],
-    tags: ["primary", "event:dispatch.assign", "domain:dispatch"],
+    name: "dispatch.assign_order",
+    description: "Assign an order/dispatch to a specific assignee (simulation).",
+    riskLevel: "MEDIUM",
+    requiredRoles: ["DISPATCH", "ADMIN"],
+    piiFields: ["assignee"],
+    tags: ["event:dispatch.assign", "primary"],
     eventTypes: ["dispatch.assign"],
     argsSchema: {
       type: "object",
+      additionalProperties: false,
+      required: ["assignee", "date", "loadValueWon"],
       properties: {
-        date: { type: "string" },
-        assignee: { type: "string" },
-        loadValueWon: { type: "number" },
-        memo: { type: "string" }
-      },
-      required: ["date", "assignee"],
-      additionalProperties: false
+        assignee: { type: "string", minLength: 1 },
+        date: { type: "string", minLength: 1 },
+        loadValueWon: { type: "integer", minimum: 1 },
+        orderId: { type: "string" },
+        notes: { type: "string" }
+      }
     }
   }
 ];
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "dispatch-mcp-server", time: new Date().toISOString() });
-});
+app.get("/health", (_req, res) => res.json({ ok: true, service: "dispatch-mcp-server" }));
+app.get("/tools", (_req, res) => res.json({ tools }));
 
-app.get("/tools", (_req, res) => {
-  res.json({ tools });
-});
+const ExecuteBodySchema = z
+  .object({
+    tool: z.string(),
+    args: z.record(z.any()).optional()
+  })
+  .passthrough();
 
-app.post(["/execute", "/invoke"], async (req, res) => {
-  const tool = typeof req.body?.tool === "string" ? req.body.tool : "";
-  const args = req.body?.args ?? {};
-
-  try {
-    if (tool === "dispatch.assign") {
-      const parsed = AssignArgs.safeParse(args);
-      if (!parsed.success) return res.status(400).json({ ok: false, error: parsed.error.flatten() });
-
-      const result = {
-        dispatchId: `disp_${Date.now()}`,
-        status: "ASSIGNED",
-        assignedAt: new Date().toISOString(),
-        ...parsed.data
-      };
-
-      return res.json({ ok: true, result });
-    }
-
-    return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return res.status(500).json({ ok: false, error: message });
+app.post(["/execute", "/invoke"], (req, res) => {
+  const parsed = ExecuteBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, error: parsed.error.flatten() });
   }
+
+  const tool = parsed.data.tool;
+  const args = parsed.data.args || {};
+
+  if (tool !== "dispatch.assign_order") {
+    return res.status(404).json({ ok: false, error: `Unknown tool: ${tool}` });
+  }
+
+  const assignee = typeof args.assignee === "string" ? args.assignee.trim() : "";
+  const date = typeof args.date === "string" ? args.date.trim() : "";
+  const loadValueWon = typeof args.loadValueWon === "number" ? args.loadValueWon : Number(args.loadValueWon);
+
+  if (!assignee) return res.status(400).json({ ok: false, error: "assignee is required" });
+  if (!date) return res.status(400).json({ ok: false, error: "date is required" });
+  if (!Number.isFinite(loadValueWon) || loadValueWon <= 0) return res.status(400).json({ ok: false, error: "loadValueWon must be a positive number" });
+
+  const dispatchId = `DSP-${Date.now()}`;
+
+  return res.json({
+    ok: true,
+    result: {
+      dispatchId,
+      assignee,
+      date,
+      loadValueWon,
+      orderId: typeof args.orderId === "string" ? args.orderId : undefined,
+      notes: typeof args.notes === "string" ? args.notes : undefined,
+      simulated: true
+    }
+  });
 });
 
 app.listen(PORT, () => {
