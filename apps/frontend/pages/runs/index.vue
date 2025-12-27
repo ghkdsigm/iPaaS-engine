@@ -35,15 +35,15 @@
 </template>
 
 <script setup lang="ts">
-const config = useRuntimeConfig();
+const { $axios } = useNuxtApp();
 const runs = ref<any[]>([]);
 const loading = ref(true);
 
 async function load() {
   loading.value = true;
   try {
-    const res: any = await $fetch(`${config.public.apiBase}/runs`);
-    runs.value = Array.isArray(res) ? res : (res?.runs ?? []);
+    const res: any = await $axios.get('/runs');
+    runs.value = Array.isArray(res.data) ? res.data : (res.data?.runs ?? []);
   } finally {
     loading.value = false;
   }

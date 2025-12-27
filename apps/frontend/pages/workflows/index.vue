@@ -137,9 +137,7 @@
 </template>
 
 <script setup lang="ts">
-const config = useRuntimeConfig();
-const apiBase = config.public.apiBase as string;
-
+const { $axios } = useNuxtApp();
 const command = ref("");
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -219,17 +217,15 @@ async function runCommand() {
 
   loading.value = true;
   try {
-    const res = await $fetch(`${apiBase}/commands`, {
-      method: "POST",
+    const res = await $axios.post('/commands', { command: trimmed }, {
       headers: { Authorization: "Bearer dev" },
-      body: { command: trimmed }
     });
 
-    result.value = res;
+    result.value = res.data;
   } catch (e: any) {
     const msg =
-      e?.data?.message ||
-      e?.data?.error ||
+      e?.response?.data?.message ||
+      e?.response?.data?.error ||
       e?.message ||
       "Failed to execute command";
     error.value = typeof msg === "string" ? msg : JSON.stringify(msg);

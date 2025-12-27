@@ -1,24 +1,32 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 import { WorkflowEngineService } from "../workflow-engine/workflow-engine.service";
-import { ToolRegistryService } from "../tool-registry/tool-registry.service";
-import { InterpreterService } from "../interpreter/interpreter.service";
 
 @Injectable()
 export class ApprovalsService {
-  constructor(
-    private prisma: PrismaClient,
-    private workflow: WorkflowEngineService,
-    private registry: ToolRegistryService,
-    private interpreter: InterpreterService
-  ) {}
+  constructor(private prisma: PrismaClient, private workflow: WorkflowEngineService) {}
 
   async list() {
     const approvals = await this.prisma.approval.findMany({
       orderBy: { createdAt: "desc" },
       include: { plan: { include: { command: true } } }
     });
-    return { approvals };
+
+    return {
+      ok: true,
+      approvals: approvals.map((a) => ({
+        id: a.id,
+        status: a.status,
+        reason: a.reason,
+        createdAt: a.createdAt,
+        resolvedAt: a.resolvedAt,
+        planId: a.planId,
+        command: { id: a.plan.command.id, raw: a.plan.command.raw, createdAt: a.plan.command.createdAt },
+        preview: a.plan.preview ?? null,
+        diff: a.plan.diff ?? null,
+        steps: a.plan.steps
+      }))
+    };
   }
 
   async approve(id: string) {
@@ -34,12 +42,10 @@ export class ApprovalsService {
       data: { status: "APPROVED", resolvedAt: new Date() }
     });
 
-    await this.registry.ensureServer("hr");
-    await this.registry.sync("hr");
+    const steps = (approval.plan.steps as any[]) || [];
+    const run = await this.workflow.executePlan({ commandId: approval.plan.commandId, planId: approval.planId, steps });
 
-    const steps = approval.plan.steps as any[];
-    const exec = await this.workflow.execute(approval.plan.commandId, approval.planId, steps, t => this.interpreter.resolvePii(t));
-    return { ok: true, runId: exec.runId };
+    return { ok: true, approvalId: id, run };
   }
 
   async reject(id: string) {

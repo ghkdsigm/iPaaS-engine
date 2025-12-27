@@ -4,8 +4,9 @@ export class HttpTransport {
     const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const r = await fetch(url, { signal: controller.signal });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.json();
+      const json = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(json?.error ? String(json.error) : `HTTP ${r.status}`);
+      return json;
     } finally {
       clearTimeout(t);
     }
@@ -22,7 +23,7 @@ export class HttpTransport {
         signal: controller.signal
       });
       const json = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(json?.error ? JSON.stringify(json.error) : `HTTP ${r.status}`);
+      if (!r.ok) throw new Error(json?.error ? String(json.error) : `HTTP ${r.status}`);
       return json;
     } finally {
       clearTimeout(t);

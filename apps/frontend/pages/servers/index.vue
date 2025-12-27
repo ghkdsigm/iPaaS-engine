@@ -30,6 +30,7 @@
 </template>
 
 <script setup>
+const { $axios } = useNuxtApp();
 const tools = ref([]);
 const loading = ref(true);
 const syncing = ref(false);
@@ -38,8 +39,8 @@ const statusMessage = ref("");
 async function fetchTools() {
   loading.value = true;
   try {
-    const res = await fetch("/api/tool-registry/tools");
-    tools.value = await res.json();
+    const res = await $axios.get("/tool-registry/tools");
+    tools.value = res.data;
   } finally {
     loading.value = false;
   }
@@ -49,8 +50,8 @@ async function sync() {
   syncing.value = true;
   statusMessage.value = "";
   try {
-    const res = await fetch("/api/tool-registry/sync");
-    const data = await res.json();
+    const res = await $axios.get("/tool-registry/sync");
+    const data = res.data;
     statusMessage.value = data?.ok ? "Synced" : "Sync failed";
     await fetchTools();
   } catch (e) {

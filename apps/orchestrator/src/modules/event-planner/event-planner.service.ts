@@ -2,118 +2,111 @@ import { Injectable } from "@nestjs/common";
 import type { EventIntent, EventType, MissingSlot } from "../eventing/event.types";
 import { ToolRegistryService } from "../tool-registry/tool-registry.service";
 import { validateArgs } from "../tool-registry/schema/schema.validator";
+import { argKeyFor } from "../eventing/event.registry";
 
 export type StepDraft = { tool: string; args: any; timeoutMs?: number };
 
 export type PlanBuildResult =
-  | { ok: true; steps: StepDraft[]; preview: any }
+  | { ok: true; steps: StepDraft[]; preview: any[]; diffs: any[] }
   | {
       ok: false;
       reason: string;
       missingTools?: { eventType: EventType; candidates: string[] }[];
       missingArgs?: MissingSlot[];
+      preview?: any[];
+      diffs?: any[];
     };
 
-const EVENT_TOOL_CANDIDATES: Record<EventType, string[]> = {
-  "payroll.pay": ["payroll.pay", "finance.pay_salary", "hr.pay_salary"],
-  "dispatch.assign": ["dispatch.assign", "dispatch.assign_order"],
-  "ledger.post": ["ledger.post", "finance.ledger_post"]
-};
-
-function pickFirstExisting(available: Set<string>, candidates: string[]) {
-  for (const c of candidates) if (available.has(c)) return c;
-  return null;
+function shallowClone<T>(v: T): T {
+  return v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T);
 }
 
-function mapEventToArgs(type: EventType, slots: Record<string, any>) {
-  if (type === "payroll.pay") {
-    return {
-      payee: slots.payee,
-      amountWon: slots.amountWon,
-      date: slots.date,
-      reason: slots.reason
-    };
+function buildArgsFromSlots(eventType: EventType, slots: Record<string, any>) {
+  const args: Record<string, any> = {};
+  for (const [k, v] of Object.entries(slots || {})) {
+    const argKey = argKeyFor(eventType, k);
+    args[argKey] = v;
   }
 
-  if (type === "dispatch.assign") {
-    return {
-      assignee: slots.assignee,
-      date: slots.date,
-      loadValueWon: slots.loadValueWon,
-      memo: slots.memo
-    };
+  // Common aliases (helps when tools keep legacy arg names)
+  if (eventType === "payroll.pay") {
+    if (slots.payee && args.employeeName === undefined) args.employeeName = slots.payee;
+    if (slots.amountWon && args.amountWon === undefined) args.amountWon = slots.amountWon;
   }
+  return args;
+}
 
-  if (type === "ledger.post") {
-    return {
-      date: slots.date,
-      amountWon: slots.amountWon,
-      summary: slots.summary,
-      counterparty: slots.counterparty
-    };
+function diffKeys(before: any, after: any) {
+  const all = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+  const changes: any[] = [];
+  for (const k of all) {
+    const b = (before || {})[k];
+    const a = (after || {})[k];
+    if (JSON.stringify(b) !== JSON.stringify(a)) changes.push({ path: k, before: b, after: a });
   }
-
-  return slots;
+  return changes;
 }
 
 @Injectable()
 export class EventPlannerService {
   constructor(private registry: ToolRegistryService) {}
 
+  /**
+   * EventPlanner:
+   * 1) candidates = tools where tool.eventTypes includes eventType OR tool.tags includes event:<eventType>
+   * 2) choose best candidate (deterministic ranking)
+   * 3) map slots -> args (event argMap)
+   * 4) validate argsSchema (AJV with coercion) -> finalArgs
+   * 5) produce preview + diff (slots -> args -> coercedArgs)
+   */
   async build(events: EventIntent[]): Promise<PlanBuildResult> {
-    const toolList = await this.registry.list();
-    const available = new Set(toolList.tools.map(t => t.name));
-
-    const missingTools: { eventType: EventType; candidates: string[] }[] = [];
     const steps: StepDraft[] = [];
     const preview: any[] = [];
+    const diffs: any[] = [];
+    const missingTools: { eventType: EventType; candidates: string[] }[] = [];
+    const missingArgs: MissingSlot[] = [];
 
     for (const ev of events) {
-      const candidates = EVENT_TOOL_CANDIDATES[ev.type];
-      const selected = pickFirstExisting(available, candidates);
-      if (!selected) {
-        missingTools.push({ eventType: ev.type, candidates });
-        preview.push({ eventId: ev.id, eventType: ev.type, selectedTool: null, args: mapEventToArgs(ev.type, ev.slots) });
+      const candidates = await this.registry.findCandidatesForEvent(ev.type);
+      if (!candidates.length) {
+        missingTools.push({ eventType: ev.type, candidates: [] });
+        preview.push({ eventId: ev.id, eventType: ev.type, selectedTool: null, args: buildArgsFromSlots(ev.type, ev.slots) });
         continue;
       }
 
-      const tool = await this.registry.getToolByName(selected);
-      const args = mapEventToArgs(ev.type, ev.slots);
-      const validation = validateArgs((tool as any).argsSchema, args);
-      if (!validation.ok) {
-        // schema 기반으로 부족한 슬롯을 질문으로 돌린다
-        const missing: MissingSlot[] = [];
-        const required = (tool as any).argsSchema?.required;
-        if (Array.isArray(required)) {
-          for (const k of required) {
-            const v = (args as any)[k];
-            const has = v !== undefined && v !== null && `${v}`.length > 0;
-            if (!has) {
-              missing.push({
-                eventId: ev.id,
-                eventType: ev.type,
-                slot: String(k),
-                required: true,
-                question: `${ev.type} 실행을 위해 '${k}' 값이 필요합니다.`
-              });
-            }
-          }
+      const selected = candidates[0];
+      const mappedArgs = buildArgsFromSlots(ev.type, ev.slots);
+      const finalArgs = shallowClone(mappedArgs);
+
+      if (selected.argsSchema) {
+        const v = validateArgs(selected.argsSchema, finalArgs);
+        if (!v.ok) {
+          // argsSchema mismatch -> do not execute, ask user
+          missingArgs.push({
+            eventId: ev.id,
+            eventType: ev.type,
+            slot: "(argsSchema)",
+            question: `선택된 도구(${selected.name}) 실행에 필요한 인자 형태가 맞지 않습니다: ${v.error}`
+          });
+          preview.push({ eventId: ev.id, eventType: ev.type, selectedTool: selected.name, args: mappedArgs, argsError: v.error });
+          diffs.push({ eventId: ev.id, eventType: ev.type, tool: selected.name, changes: diffKeys(mappedArgs, finalArgs) });
+          continue;
         }
-        return { ok: false, reason: `Missing args for ${selected}`, missingArgs: missing };
       }
 
-      steps.push({ tool: selected, args });
-      preview.push({ eventId: ev.id, eventType: ev.type, selectedTool: selected, args });
+      steps.push({ tool: selected.name, args: finalArgs });
+      preview.push({ eventId: ev.id, eventType: ev.type, selectedTool: selected.name, args: finalArgs });
+      diffs.push({ eventId: ev.id, eventType: ev.type, tool: selected.name, changes: diffKeys(mappedArgs, finalArgs) });
     }
 
     if (missingTools.length > 0) {
-      return {
-        ok: false,
-        reason: "No executable tool for one or more events",
-        missingTools
-      };
+      return { ok: false, reason: "No executable tool for one or more events", missingTools, preview, diffs };
     }
 
-    return { ok: true, steps, preview };
+    if (missingArgs.length > 0) {
+      return { ok: false, reason: "Tool args are invalid or incomplete", missingArgs, preview, diffs };
+    }
+
+    return { ok: true, steps, preview, diffs };
   }
 }

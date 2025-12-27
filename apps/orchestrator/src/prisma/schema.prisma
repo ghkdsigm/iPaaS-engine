@@ -25,6 +25,8 @@ model Tool {
   requiredRoles String[] @default([])
   piiFields     String[] @default([])
   argsSchema    Json?
+  tags          String[] @default([])
+  eventTypes    String[] @default([])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   server        ToolServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
@@ -44,6 +46,8 @@ model Plan {
   id           String   @id @default(cuid())
   commandId    String   @unique
   steps        Json
+  preview      Json?
+  diff         Json?
   needsApproval Boolean @default(false)
   createdAt    DateTime @default(now())
   command      Command  @relation(fields: [commandId], references: [id], onDelete: Cascade)

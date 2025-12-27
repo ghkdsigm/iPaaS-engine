@@ -56,9 +56,7 @@
 </template>
 
 <script setup lang="ts">
-const config = useRuntimeConfig();
-const apiBase = config.public.apiBase as string;
-
+const { $axios } = useNuxtApp();
 const pinging = ref(false);
 const pingResult = ref<string | null>(null);
 const pingError = ref<string | null>(null);
@@ -87,12 +85,11 @@ async function ping() {
   pinging.value = true;
 
   try {
-    const res: any = await $fetch(`${apiBase}/health`, {
-      method: "GET",
+    const res: any = await $axios.get('/health', {
       headers: { Authorization: "Bearer dev" }
     });
 
-    pingResult.value = typeof res === "string" ? res : JSON.stringify(res);
+    pingResult.value = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
   } catch (e: any) {
     pingError.value = e?.message || "Ping failed";
   } finally {
