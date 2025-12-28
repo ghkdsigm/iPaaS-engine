@@ -192,6 +192,14 @@ IPAAS-ENGINE/
 │  │  │  │  │  ├─ runs.controller.ts    # /runs 엔드포인트
 │  │  │  │  │  ├─ runs.service.ts        # 실행 이력 조회, 필터링
 │  │  │  │  │  └─ health.controller.ts   # 헬스체크 엔드포인트
+│  │  │  │  ├─ eventing/                # 이벤트 처리 모듈
+│  │  │  │  │  ├─ eventing.module.ts
+│  │  │  │  │  ├─ event-interpreter.service.ts # 이벤트 해석 서비스
+│  │  │  │  │  ├─ event.registry.ts      # 이벤트 레지스트리
+│  │  │  │  │  └─ event.types.ts        # 이벤트 타입 정의
+│  │  │  │  ├─ event-planner/           # 이벤트 계획 모듈
+│  │  │  │  │  ├─ event-planner.module.ts
+│  │  │  │  │  └─ event-planner.service.ts # 이벤트 계획 서비스
 │  │  │  │  └─ command-api/             # 0) 진입점(자연어 명령 접수)
 │  │  │  │     ├─ command.module.ts
 │  │  │  │     ├─ command.controller.ts # /command 엔드포인트
@@ -235,7 +243,12 @@ IPAAS-ENGINE/
 │  │  │     ├─ variables.scss              # CSS 변수
 │  │  │     ├─ mixins.scss                 # SCSS 믹스인
 │  │  │     └─ reset.scss                 # CSS 리셋
+│  │  ├─ plugins/                         # Nuxt 플러그인
+│  │  │  └─ axios.client.ts               # Axios 클라이언트 플러그인
+│  │  ├─ types/                           # TypeScript 타입 정의
+│  │  │  └─ nuxt.d.ts                     # Nuxt 타입 확장
 │  │  ├─ nuxt.config.ts                   # Nuxt 설정 파일
+│  │  ├─ tailwind.config.js               # Tailwind CSS 설정
 │  │  ├─ package.json                     # 의존성 및 스크립트
 │  │  └─ Dockerfile                       # Docker 이미지 빌드 설정
 │  │
@@ -264,8 +277,28 @@ IPAAS-ENGINE/
 │  │  ├─ package.json
 │  │  └─ Dockerfile                       # Docker 이미지 빌드 설정
 │  │
+│  ├─ finance-mcp-server/                 # 재무 부서 MCP 서버
+│  │  ├─ src/
+│  │  │  ├─ main.ts                       # TypeScript 진입점
+│  │  │  └─ main.js                       # JavaScript 진입점 (컴파일된)
+│  │  ├─ package.json
+│  │  └─ Dockerfile                       # Docker 이미지 빌드 설정
+│  │
+│  ├─ dispatch-mcp-server/               # Dispatch MCP 서버
+│  │  ├─ src/
+│  │  │  ├─ main.ts                       # TypeScript 진입점
+│  │  │  └─ main.js                       # JavaScript 진입점 (컴파일된)
+│  │  ├─ package.json
+│  │  └─ Dockerfile                       # Docker 이미지 빌드 설정
+│  │
+│  ├─ ledger-mcp-server/                 # Ledger MCP 서버
+│  │  ├─ src/
+│  │  │  ├─ main.ts                       # TypeScript 진입점
+│  │  │  └─ main.js                       # JavaScript 진입점 (컴파일된)
+│  │  ├─ package.json
+│  │  └─ Dockerfile                       # Docker 이미지 빌드 설정
+│  │
 │  ├─ it-mcp-server/                      # IT 부서 MCP 서버 (구현 예정)
-│  ├─ finance-mcp-server/                 # 재무 부서 MCP 서버 (구현 예정)
 │  ├─ erp-mcp-server/                     # ERP MCP 서버 (구현 예정)
 │  └─ sales-mcp-server/                   # 영업 부서 MCP 서버 (구현 예정)
 │
