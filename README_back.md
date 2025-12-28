@@ -322,3 +322,20 @@ IPAAS-ENGINE/
 ├─ PATCH3_NOTES.md                        # 패치 3 노트
 ├─ README_back.md                         # 백업 README (이 파일)
 └─ README.md                              # 메인 README
+
+
+
+
+##db접속
+
+Host: localhost
+
+Port: 15432 (또는 compose ps에서 본 포트)
+
+Database: company_automation
+
+User: company
+
+Password: company_pw
+
+SSL: 사용 안 함
