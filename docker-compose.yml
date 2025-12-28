@@ -60,7 +60,7 @@ services:
     container_name: orchestrator
     environment:
       PORT: ${ORCHESTRATOR_PORT:-3001}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://company:company_pw@postgres:5432/company_automation?schema=public}
+      DATABASE_URL: ${DATABASE_URL}
       HR_MCP_BASE_URL: http://hr-mcp-server:${HR_MCP_PORT:-4001}
       FINANCE_MCP_BASE_URL: http://finance-mcp-server:${FINANCE_MCP_PORT:-4011}
       DISPATCH_MCP_BASE_URL: http://dispatch-mcp-server:${DISPATCH_MCP_PORT:-4021}

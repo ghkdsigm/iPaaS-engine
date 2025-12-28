@@ -31,6 +31,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       });
     }
 
+    // Log unexpected errors for debugging
+    console.error("[HttpExceptionFilter] Unhandled error:", {
+      message: exception?.message,
+      stack: exception?.stack,
+      path: req.url,
+      method: req.method,
+      body: req.body
+    });
+
     return res.status(500).json({
       ok: false,
       code: "INTERNAL_ERROR",

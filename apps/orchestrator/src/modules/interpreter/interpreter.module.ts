@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
+import { ToolRegistryModule } from "../tool-registry/tool-registry.module";
 import { InterpreterService } from "./interpreter.service";
-import { PiiVault } from "./pii.vault";
 
 @Module({
-  providers: [InterpreterService, PiiVault],
-  exports: [InterpreterService, PiiVault]
+  imports: [ToolRegistryModule],
+  providers: [InterpreterService],
+  exports: [InterpreterService]
 })
 export class InterpreterModule {}

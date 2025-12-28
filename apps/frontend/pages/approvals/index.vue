@@ -109,6 +109,9 @@ const approvals = ref<
   { id: string; status: string; reason?: string | null; createdAt: string; commandRaw: string; preview: any; diff: any }[]
 >([]);
 
+const errorMsg = ref("");
+
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleString();
@@ -123,9 +126,15 @@ function pretty(v: any) {
 
 async function load() {
   loading.value = true;
+  errorMsg.value = "";
   try {
     const r = await $axios.get<{ approvals: any[] }>('/approvals', {
-      headers: { Authorization: "Bearer dev" },
+      headers: {
+        Authorization: "Bearer dev",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache"
+      },
+      params: { _t: Date.now() }
     });
 
     approvals.value = ((r.data.approvals || []) as any[]).map((a: any) => ({
@@ -137,6 +146,9 @@ async function load() {
       preview: a.preview ?? null,
       diff: a.diff ?? null,
     }));
+  } catch (e: any) {
+    errorMsg.value = e?.response?.data?.message || e?.message || "Approvals 로드 실패";
+    approvals.value = [];
   } finally {
     loading.value = false;
   }

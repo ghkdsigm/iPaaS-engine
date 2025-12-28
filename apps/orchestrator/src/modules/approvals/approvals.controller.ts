@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from "@nestjs/common";
+import { Controller, Get, Header, Param, Post, Res } from "@nestjs/common";
 import { ApprovalsService } from "./approvals.service";
 
 @Controller("approvals")
@@ -6,11 +6,21 @@ export class ApprovalsController {
   constructor(private svc: ApprovalsService) {}
 
   @Get()
-  list() { return this.svc.list(); }
+  @Header("Cache-Control", "no-cache, no-store, must-revalidate")
+  @Header("Pragma", "no-cache")
+  @Header("Expires", "0")
+  async list(@Res() res: any) {
+    const result = await this.svc.list();
+    return res.json(result);
+  }
 
   @Post(":id/approve")
-  approve(@Param("id") id: string) { return this.svc.approve(id); }
+  async approve(@Param("id") id: string) {
+    return await this.svc.approve(id);
+  }
 
   @Post(":id/reject")
-  reject(@Param("id") id: string) { return this.svc.reject(id); }
+  async reject(@Param("id") id: string) {
+    return await this.svc.reject(id);
+  }
 }

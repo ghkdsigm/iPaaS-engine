@@ -75,9 +75,17 @@ docker compose up -d --force-recreate
 
 docker compose ps
 
+또는 (캐시/이전 컨테이너/이전 이미지 싹 제거)
+
+docker compose down --remove-orphans --volumes
+docker compose build --no-cache --pull
+docker compose up -d --force-recreate
+docker compose ps
 
 -------------------------------------------
 
+docker compose down --remove-orphans
+docker compose up -d --force-recreate
 
 #db싹 사라지면
 

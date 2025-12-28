@@ -201,4 +201,9 @@ export class ToolRegistryService {
     this._seeded = true;
   }
 
+  async listTools() {
+    const { tools } = await this.list();
+    return tools;
+  }
+
 }

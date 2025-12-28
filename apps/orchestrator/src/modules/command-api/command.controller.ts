@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Post } from "@nestjs/common";
 import { z } from "zod";
 import { CommandService } from "./command.service";
 
@@ -9,8 +9,14 @@ export class CommandController {
   constructor(private svc: CommandService) {}
 
   @Post()
-  create(@Body() body: any) {
-    const parsed = Schema.parse(body);
-    return this.svc.create(parsed.command, parsed.idempotencyKey);
+  async create(@Body() body: any) {
+    const parsed = Schema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        message: "Validation failed",
+        errors: parsed.error.errors
+      });
+    }
+    return await this.svc.create(parsed.data.command, parsed.data.idempotencyKey);
   }
 }

@@ -61,7 +61,8 @@ export class CommandService {
     const meta = await this.toolRegistry.getStepMetas(steps.map((s) => ({ tool: s.tool, args: s.args })));
     const policyResult = this.policy.evaluate({
       steps: meta,
-      userRoles: ["ADMIN"]
+      userRoles: ["ADMIN"],
+      piiTokens: parsed.piiTokens ?? []
     });
 
     const plan = await this.prisma.plan.create({

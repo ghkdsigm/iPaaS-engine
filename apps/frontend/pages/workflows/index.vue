@@ -96,13 +96,15 @@
               approvalId: <span style="font-weight: 900; margin-left: 6px">{{ result.approvalId }}</span>
             </div>
 
-            <NuxtLink v-if="result.runId" to="/runs" style="text-decoration: none; margin-left: auto">
-              <button :style="btnSecondary">Runs에서 확인</button>
-            </NuxtLink>
+            <div style="display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap">
+              <NuxtLink v-if="result.runId" to="/runs" style="text-decoration: none">
+                <button :style="btnSecondary">Runs에서 확인</button>
+              </NuxtLink>
 
-            <NuxtLink v-if="result.approvalId" to="/approvals" style="text-decoration: none; margin-left: auto">
-              <button :style="btnSecondary">Approvals에서 승인</button>
-            </NuxtLink>
+              <NuxtLink v-if="result.approvalId" to="/approvals" style="text-decoration: none">
+                <button :style="btnSecondary">Approvals에서 승인</button>
+              </NuxtLink>
+            </div>
           </div>
 
           <pre
